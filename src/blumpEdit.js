@@ -501,18 +501,18 @@ var BLUMP_EDIT = (function () {
             if (drawMode === "active" || drawMode === "both") {
                 this.thing.mesh = this.activeBlump.mesh;
                 this.thing.blumps = null;
-                this.thing.render(room, this.program, eye);
+                this.thing.render(room, this.program);
             }
             if (drawMode === "angle" || drawMode === "both") {
                 this.thing.mesh = null;
                 this.thing.blumps = this.blumps;
-                this.thing.render(room, this.program, eye);
+                this.thing.render(room, this.program);
             }
             if (drawMode === "all") {
                 this.thing.blumps = null;
                 for (var b = 0; b < this.blumps.length; ++b) {
                     this.thing.mesh = this.blumps[b].mesh;
-                    this.thing.render(room, this.program, eye);
+                    this.thing.render(room, this.program);
                 }
             }
         }
@@ -668,11 +668,11 @@ var BLUMP_EDIT = (function () {
                 this.thing.blumps = null;
                 for (var b = 0; b < blumps.length; ++b) {
                     this.thing.mesh = blumps[b].mesh;
-                    this.thing.render(room, this.program, eye);
+                    this.thing.render(room, this.program);
                 }
                 this.thing.blumps = blumps;
             } else {
-                this.thing.render(room, this.program, eye);
+                this.thing.render(room, this.program);
             }
         }
     };

@@ -1,6 +1,68 @@
 var EXAMPLES = (function () {
     "use strict";
 
+    function Test2D() {
+        this.batch = new BLIT.Batch("images/");
+        this.image = this.batch.load("test.png");
+        this.flip = new BLIT.Flip(this.batch, "test", 6, 2).setupPlayback(80, true);
+        this.batch.commit();
+
+        this.maximize = false;
+        this.updateInDraw = true;
+    }
+
+    Test2D.prototype.update = function (now, elapsed, keyboard, pointer) {
+        if (this.batch.loaded) {
+            this.flip.update(elapsed);
+        }
+    };
+
+    Test2D.prototype.draw = function (context, width, height) {
+        context.clearRect(0, 0, width, height);
+        if (this.batch.loaded) {
+            BLIT.draw(context, this.image, 100, 100, BLIT.ALIGN.Center, 0, 0, BLIT.MIRROR.Horizontal, [1,0,0]);
+            this.flip.draw(context, 200, 50, BLIT.ALIGN.Left, 0, 0, BLIT.MIRROR.Vertical);
+        }
+    };
+
+    function Test3D(viewport) {
+        this.clearColor = [0, 0, 0, 1];
+        this.maximize = viewport === "safe";
+        this.updateInDraw = false;
+        this.updateInterval = 16;
+        this.angle = 0;
+        this.viewport = viewport ? viewport : "canvas";
+        this.program = null;
+        this.batch = null;
+        this.thing = null;
+    }
+
+    Test3D.prototype.setupRoom = function (room) {
+        this.program = room.programFromElements("vertex-test", "fragment-test", true, true, true);
+        this.batch = new BLIT.Batch("images/");
+
+        var mesh = WGL.makePlane(WGL.uvFill());
+        mesh.image = this.batch.load("uv.png");
+        this.batch.commit();
+        this.thing = new BLOB.Thing(mesh);
+    };
+
+    Test3D.prototype.update = function (now, elapsed, keyboard, pointer) {
+        if (this.thing) {
+            this.thing.rotate(elapsed * Math.PI * 0.0001, new R3.V(0, 1, 0));
+        }
+    };
+
+    Test3D.prototype.render = function (room, width, height) {
+        room.clear(this.clearColor);
+        if (!this.batch.loaded) {
+            return;
+        }
+        room.viewer.positionView(new R3.V(2, 0, 0), R3.origin(), new R3.V(0, 1, 0));
+        room.setupView(this.program, this.viewport);
+        this.thing.render(room, this.program);
+    };
+
     function SplineExample() {
         this.maximize = false;
         this.updateInDraw = true;
@@ -148,6 +210,8 @@ var EXAMPLES = (function () {
     };
 
     return {
+        Test2D: Test2D,
+        Test3D: Test3D,
         SplineExample: SplineExample
     };
 }());
