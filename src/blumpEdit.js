@@ -89,7 +89,7 @@ var BLUMP_EDIT = (function () {
     }
 
     ImageEditor.prototype.applyChanges = function () {
-        this.blump.constructFromImage(this.preview);
+        this.blump.constructFromImage(this.preview, null, true, true, false);
         this.dirty = false;
         postUpdate(this.preview, this.blump.resource);
     };
@@ -272,31 +272,31 @@ var BLUMP_EDIT = (function () {
             initAngle = setupSlider("Angle", function (value) {
                 if (self.activeBlump && !isNaN(value)) {
                     self.activeBlump.angle = R2.clampAngle(value * R2.DEG_TO_RAD);
-                    self.activeBlump.reposition();
+                    self.reposition(self.activeBlump);
                 }
             }),
             initX = setupSlider("X", function (value) {
                 if (self.activeBlump && !isNaN(value)) {
                     self.activeBlump.offset.x = value;
-                    self.activeBlump.reposition();
+                    self.reposition(self.activeBlump);
                 }
             }),
             initY = setupSlider("Y", function (value) {
                 if (self.activeBlump && !isNaN(value)) {
                     self.activeBlump.offset.y = value;
-                    self.activeBlump.reposition();
+                    self.reposition(self.activeBlump);
                 }
             }),
             initZ = setupSlider("Z", function (value) {
                 if (self.activeBlump && !isNaN(value)) {
                     self.activeBlump.offset.z = value;
-                    self.activeBlump.reposition();
+                    self.reposition(self.activeBlump);
                 }
             }),
             initScale = setupSlider("Scale", function (value) {
                 if (self.activeBlump && !isNaN(value)) {
                     self.activeBlump.scale = value;
-                    self.activeBlump.reposition();
+                    self.reposition(self.activeBlump);
                 }
             }),
             reload = document.getElementById("buttonReload"),
@@ -426,7 +426,7 @@ var BLUMP_EDIT = (function () {
             atlas = blumps[0].constructAtlas(this.blumps.length);
         for (var b = 0; b < blumps.length; ++b) {
             blumps[b].construct(atlas, true, false);
-            blumps[b].reposition();
+            this.reposition(blumps[b]);
         }
 
         var atlasDiv = document.getElementById("atlas");
@@ -525,6 +525,7 @@ var BLUMP_EDIT = (function () {
         this.preventDefaultIO = true;
         this.viewport = viewport ? viewport : "canvas";
         this.thing = null;
+        this.anim = null;
         this.program = null;
         this.distance = 0.5;
         this.zoom = 1;
@@ -547,8 +548,6 @@ var BLUMP_EDIT = (function () {
             "images/blumpy/wave/wave07/frame.JSON",
             "images/blumpy/wave/wave08/frame.JSON"
         ];
-
-        this.frames = [];
     }
 
     AnimTest.prototype.batch = function (blumpData, frame) {
