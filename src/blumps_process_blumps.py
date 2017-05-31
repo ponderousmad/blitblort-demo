@@ -73,7 +73,7 @@ def process_blumps(img, drw, folder, batchRoot, width, top, bottom, pixelSize, d
                     angle += angle_step
                 data["blumps"] = blumps
 
-                with open(os.path.join(path, "frame.JSON"), 'w') as f:
+                with open(os.path.join(path, "frame.json"), 'w') as f:
                     f.write(json.dumps(data, indent=4))
         
         except Exception as err:
