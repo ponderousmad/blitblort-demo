@@ -524,8 +524,8 @@ var BLUMP_EDIT = (function () {
         this.updateInDraw = true;
         this.preventDefaultIO = true;
         this.viewport = viewport ? viewport : "canvas";
-        this.thing = null;
-        this.anim = null;
+        this.thing = new BLOB.Thing();
+        this.anim = new BLOB.Anim(200, true);
         this.program = null;
         this.distance = 0.5;
         this.zoom = 1;
@@ -536,7 +536,7 @@ var BLUMP_EDIT = (function () {
         this.turnRate = document.getElementById("sliderTurnRate");
         this.animRate = document.getElementById("sliderAnimRate");
         this.loadingFrame = 0;
-        this.loadState = null;
+        this.loadState = "init";
 
         this.frameFiles = [
             "images/blumpy/wave/wave01/frame.JSON",
@@ -550,10 +550,10 @@ var BLUMP_EDIT = (function () {
         ];
     }
 
-    AnimTest.prototype.batch = function (blumpData, frame) {
+    AnimTest.prototype.batch = function (blumpData) {
         this.loadState = "batching";
 
-        var blumps = frame.blumps,
+        var blumps = [],
             pixelSize = blumpData.pixelSize || 0.001,
             depthRange = blumpData.depthRange || 0.2;
         for (var d = 0; d < blumpData.blumps.length; ++d) {
@@ -573,35 +573,28 @@ var BLUMP_EDIT = (function () {
 
     AnimTest.prototype.constructBlumps = function (blumps) {
         this.loadState = "constructing";
-        var image = blumps[0].image;
+        var image = blumps[0].image,
+            things = [];
         for (var b = 0; b < blumps.length; ++b) {
-            blumps[b].construct(null);
-            blumps[b].image = null;
-            blumps[b].reposition(true);
+            var blump = blumps[b];
+            blump.construct(null);
+            blumps.image = null;
+            var blumpThing = new BLOB.Thing(blump.mesh);
+            blump.placeThing(blumpThing);
+            things.push(blumpThing);
+            blumpThing.setParent(this.thing);
+            blump.simplify();
         }
-        this.loadState = null;
+
+        this.anim.addFrame(things);
+
+        this.loadState = "init";
         this.loadingFrame += 1;
 
         if (this.loadingFrame == this.frameFiles.length) {
-            this.connectFrames();
+            this.anim.makePingPong();
+            this.loadState = null;
         }
-    };
-
-    AnimTest.prototype.connectFrames = function () {
-        for (var extra = this.frames.length - 2; extra > 1; --extra) {
-            var toCopy = this.frames[extra];
-            this.frames.push(new BLOB.Frame(toCopy.blumps, toCopy.duration));
-        }
-
-        for (var f = 0; f < this.frames.length; ++f) {
-            var frame = this.frames[f];
-            frame.next = (f+1) % this.frames.length;
-            for (var b = 0; b < frame.blumps.length; ++b) {
-                frame.blumps[b].simplify();
-            }
-        }
-        this.thing = new BLOB.Thing();
-        this.thing.setFrames(this.frames, 0);
     };
 
     AnimTest.prototype.setupRoom = function (room) {
@@ -614,17 +607,15 @@ var BLUMP_EDIT = (function () {
 
     AnimTest.prototype.update = function (now, elapsed, keyboard, pointer) {
         if (this.loadingFrame < this.frameFiles.length) {
-            if (this.loadState === null) {
+            if (this.loadState === "init") {
                 this.loadState = "setup";
-                var self = this,
-                    frame = new BLOB.Frame([], 200);
-                this.frames.push(frame);
+                var self = this;
                 IO.downloadJSON(this.frameFiles[this.loadingFrame], function (data) {
-                    self.batch(data, frame);
+                    self.batch(data);
                 });
             }
         }
-        if (this.thing) {
+        if (this.loadState === null) {
             var angleDelta = 0;
             if (pointer.primary) {
                 angleDelta = pointer.primary.deltaX * 0.01;
@@ -632,10 +623,13 @@ var BLUMP_EDIT = (function () {
                 var turnRate = (this.turnRate ? parseFloat(this.turnRate.value) : null) || 1;
                 angleDelta = elapsed * Math.PI * 0.001 * turnRate;
             }
-            this.thing.rotate(angleDelta, new R3.V(0, 1, 0));
+
+            if (angleDelta !== 0) {
+                this.thing.rotate(angleDelta, new R3.V(0, 1, 0));
+            }
 
             var animRate = (this.animRate ? parseFloat(this.animRate.value) : null) || 1;
-            this.thing.update(elapsed * animRate);
+            this.anim.update(elapsed * animRate);
         }
 
         if (pointer.primary) {
@@ -658,20 +652,15 @@ var BLUMP_EDIT = (function () {
 
     AnimTest.prototype.render = function (room, width, height) {
         room.clear(this.clearColor);
-        if (this.thing && room.viewer.showOnPrimary()) {
+        if (this.loadState === null && room.viewer.showOnPrimary()) {
             var eye = this.eyePosition();
             room.viewer.positionView(eye, R3.origin(), new R3.V(0, 1, 0));
             room.setupView(this.program, this.viewport);
+
             if (this.drawAllCheckbox ? this.drawAllCheckbox.checked : false) {
-                var blumps = this.thing.blumps;
-                this.thing.blumps = null;
-                for (var b = 0; b < blumps.length; ++b) {
-                    this.thing.mesh = blumps[b].mesh;
-                    this.thing.render(room, this.program);
-                }
-                this.thing.blumps = blumps;
+                this.anim.renderAll(room, this.program);
             } else {
-                this.thing.render(room, this.program);
+                this.anim.renderFacing(room, this.program);
             }
         }
     };
