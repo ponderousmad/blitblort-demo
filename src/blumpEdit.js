@@ -539,14 +539,14 @@ var BLUMP_EDIT = (function () {
         this.loadState = "init";
 
         this.frameFiles = [
-            "images/blumpy/wave/wave01/frame.JSON",
-            "images/blumpy/wave/wave02/frame.JSON",
-            "images/blumpy/wave/wave03/frame.JSON",
-            "images/blumpy/wave/wave04/frame.JSON",
-            "images/blumpy/wave/wave05/frame.JSON",
-            "images/blumpy/wave/wave06/frame.JSON",
-            "images/blumpy/wave/wave07/frame.JSON",
-            "images/blumpy/wave/wave08/frame.JSON"
+            "images/blumpy/wave/wave01/wave01.json",
+            "images/blumpy/wave/wave02/wave02.json",
+            "images/blumpy/wave/wave03/wave03.json",
+            "images/blumpy/wave/wave04/wave04.json",
+            "images/blumpy/wave/wave05/wave05.json",
+            "images/blumpy/wave/wave06/wave06.json",
+            "images/blumpy/wave/wave07/wave07.json",
+            "images/blumpy/wave/wave08/wave08.json"
         ];
     }
 
