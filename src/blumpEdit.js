@@ -78,6 +78,7 @@ var BLUMP_EDIT = (function () {
         this.updateInDraw = true;
         this.preventDefaultIO = true;
         this.blump = null;
+        this.thing = null;
         this.zoom = 4;
         this.xOffset = 0;
         this.yOffset = 0;
@@ -89,7 +90,8 @@ var BLUMP_EDIT = (function () {
     }
 
     ImageEditor.prototype.applyChanges = function () {
-        this.blump.constructFromImage(this.preview, null, true, true, false);
+        this.blump.constructFromImage(this.preview, null, true, false);
+        this.thing.mesh = this.blump.mesh;
         this.dirty = false;
         postUpdate(this.preview, this.blump.resource);
     };
@@ -199,8 +201,9 @@ var BLUMP_EDIT = (function () {
         });
     }
 
-    ImageEditor.prototype.editBlump = function (blump) {
+    ImageEditor.prototype.editBlump = function (blump, thing) {
         this.blump = blump;
+        this.thing = thing;
         var canvas = this.preview,
             context = this.previewContext,
             w = blump.image.width,
@@ -224,6 +227,7 @@ var BLUMP_EDIT = (function () {
         this.editor = editor;
         this.editArea = null;
         this.thing = null;
+        this.anim = null;
         this.program = null;
         this.distance = 0.5;
         this.zoom = 1;
@@ -231,10 +235,28 @@ var BLUMP_EDIT = (function () {
         this.TILT_MAX = Math.PI * 0.49;
 
         this.blumps = [];
-        this.activeBlump = null;
+        this.activeBlumpIndex = null;
 
         this.setupControls();
     }
+
+    BlumpView.prototype.activeBlump = function () {
+        if (this.blumps && this.activeBlumpIndex !== null) {
+            if (0 <= this.activeBlumpIndex && this.activeBlumpIndex < this.blumps.length) {
+                return this.blumps[this.activeBlumpIndex];
+            }
+        }
+        return null;
+    };
+
+    BlumpView.prototype.repositionActiveBlump = function () {
+        var blump = this.activeBlump();
+        if (blump && this.anim) {
+            var thing = this.anim.things[this.activeBlumpIndex];
+            thing.resetTransform();
+            blump.placeThing(thing);
+        }
+    };
 
     BlumpView.prototype.setupControls = function () {
         this.turntableCheckbox = document.getElementById("turntable");
@@ -270,54 +292,54 @@ var BLUMP_EDIT = (function () {
 
         var self = this,
             initAngle = setupSlider("Angle", function (value) {
-                if (self.activeBlump && !isNaN(value)) {
-                    self.activeBlump.angle = R2.clampAngle(value * R2.DEG_TO_RAD);
-                    self.reposition(self.activeBlump);
+                if (self.activeBlump() && !isNaN(value)) {
+                    self.activeBlump().angle = R2.clampAngle(value * R2.DEG_TO_RAD);
+                    self.repositionActiveBlump();
                 }
             }),
             initX = setupSlider("X", function (value) {
-                if (self.activeBlump && !isNaN(value)) {
-                    self.activeBlump.offset.x = value;
-                    self.reposition(self.activeBlump);
+                if (self.activeBlump() && !isNaN(value)) {
+                    self.activeBlump().offset.x = value;
+                    self.repositionActiveBlump();
                 }
             }),
             initY = setupSlider("Y", function (value) {
-                if (self.activeBlump && !isNaN(value)) {
-                    self.activeBlump.offset.y = value;
-                    self.reposition(self.activeBlump);
+                if (self.activeBlump() && !isNaN(value)) {
+                    self.activeBlump().offset.y = value;
+                    self.repositionActiveBlump();
                 }
             }),
             initZ = setupSlider("Z", function (value) {
-                if (self.activeBlump && !isNaN(value)) {
-                    self.activeBlump.offset.z = value;
-                    self.reposition(self.activeBlump);
+                if (self.activeBlump() && !isNaN(value)) {
+                    self.activeBlump().offset.z = value;
+                    self.repositionActiveBlump();
                 }
             }),
             initScale = setupSlider("Scale", function (value) {
-                if (self.activeBlump && !isNaN(value)) {
-                    self.activeBlump.scale = value;
-                    self.reposition(self.activeBlump);
+                if (self.activeBlump() && !isNaN(value)) {
+                    self.activeBlump().scale = value;
+                    self.repositionActiveBlump();
                 }
             }),
             reload = document.getElementById("buttonReload"),
             erode = document.getElementById("buttonErode");
 
         this.connectControls = function() {
-            initAngle(self.activeBlump.angle * R2.RAD_TO_DEG);
-            initX(self.activeBlump.offset.x);
-            initY(self.activeBlump.offset.y);
-            initZ(self.activeBlump.offset.z);
-            initScale(self.activeBlump.scale);
+            initAngle(self.activeBlump().angle * R2.RAD_TO_DEG);
+            initX(self.activeBlump().offset.x);
+            initY(self.activeBlump().offset.y);
+            initZ(self.activeBlump().offset.z);
+            initScale(self.activeBlump().scale);
 
             if (self.editor) {
-                self.editor.editBlump(self.activeBlump);
+                self.editor.editBlump(self.activeBlump(), this.anim.things[this.activeBlumpIndex]);
             }
         };
 
         this.selectImage = document.getElementById("selectImage");
         if (this.selectImage) {
             this.selectImage.addEventListener("change", function (e) {
-                self.activeBlump = self.blumps[parseInt(selectImage.value)];
+                self.activeBlumpIndex = parseInt(selectImage.value);
                 self.connectControls();
             }, true);
             this.populateImages();
@@ -397,7 +419,7 @@ var BLUMP_EDIT = (function () {
         for (var d = 0; d < blumpData.blumps.length; ++d) {
             this.blumps.push(new BLUMP.Blump(blumpData.blumps[d], pixelSize, depthRange));
         }
-        this.activeBlump = this.blumps[0];
+        this.activeBlumpIndex = 0;
 
         var self = this,
             batch = new BLIT.Batch("images/", function() {
@@ -421,13 +443,21 @@ var BLUMP_EDIT = (function () {
     };
 
     BlumpView.prototype.constructBlumps = function () {
+        this.thing = new BLOB.Thing();
+        this.anim = new BLOB.Anim(0, true);
+
         var blumps = this.blumps,
             image = blumps[0].image,
+            things = [],
             atlas = blumps[0].constructAtlas(this.blumps.length);
         for (var b = 0; b < blumps.length; ++b) {
-            blumps[b].construct(atlas, true, false);
-            this.reposition(blumps[b]);
+            var blump = blumps[b];
+            blump.construct(atlas, true, false);
+            var thing = new BLOB.Thing(blump.mesh, this.thing);
+            things.push(thing);
+            blump.placeThing(thing);
         }
+        this.anim.addFrame(things);
 
         var atlasDiv = document.getElementById("atlas");
         if (atlasDiv) {
@@ -435,7 +465,6 @@ var BLUMP_EDIT = (function () {
             atlasDiv.appendChild(atlas.canvas);
         }
 
-        this.thing = new BLOB.Thing();
         this.connectControls();
     };
 
@@ -493,26 +522,22 @@ var BLUMP_EDIT = (function () {
 
     BlumpView.prototype.render = function (room, width, height) {
         room.clear(this.clearColor);
-        if (this.thing && room.viewer.showOnPrimary()) {
+        if (this.anim && room.viewer.showOnPrimary()) {
             var eye = this.eyePosition(),
-                drawMode = this.selectDraw ? this.selectDraw.value : "angle";
+                drawMode = this.selectDraw ? this.selectDraw.value : "angle",
+                activeBlump = this.activeBlump();
             room.viewer.positionView(eye, R3.origin(), new R3.V(0, 1, 0));
             room.setupView(this.program, this.viewport);
-            if (drawMode === "active" || drawMode === "both") {
-                this.thing.mesh = this.activeBlump.mesh;
-                this.thing.blumps = null;
-                this.thing.render(room, this.program);
-            }
-            if (drawMode === "angle" || drawMode === "both") {
-                this.thing.mesh = null;
-                this.thing.blumps = this.blumps;
-                this.thing.render(room, this.program);
-            }
-            if (drawMode === "all") {
-                this.thing.blumps = null;
-                for (var b = 0; b < this.blumps.length; ++b) {
-                    this.thing.mesh = this.blumps[b].mesh;
-                    this.thing.render(room, this.program);
+            if (drawMode == "all") {
+                this.anim.renderAll(room, this.program);
+            } else if (activeBlump) {
+                var angleThing = null,
+                    activeThing = this.anim.things[this.activeBlumpIndex];
+                if (drawMode == "angle" || drawMode == "both") {
+                    angleThing = this.anim.renderFacing(room, this.program);
+                }
+                if (drawMode == "active" || (drawMode == "both" && angleThing != activeThing)) {
+                    activeThing.render(room, this.program);
                 }
             }
         }
