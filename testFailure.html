@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Test Failure</title>
+        <link href="style.css" rel="stylesheet">
+        <script type="text/javascript" src="blitblort/test.js"></script>
+        <script type="text/javascript" src="blitblort/main.js"></script>
+    </head>
+    <body>
+        <button id="buttonRun" type="button">Rerun!</button>
+        <button id="buttonClear" type="button">Clear</button>
+        <div>
+            <textarea id="log" rows="50" cols="80"></textarea>
+        </div>
+        <script type="text/javascript">
+            var logElement;
+
+            function runTests()
+            {
+                var testColor = "green";
+                var failed = MAIN.runTestSuites(TEST.ASSERT);
+                const FAIL_TARGET = 15;
+                if (failed !== FAIL_TARGET) {
+                    console.log(`Expected ${FAIL_TARGET} failures, but got ${failed}`);
+                    testColor = "red";
+                }
+
+                const WARNING_TARGET = 35;
+                if (TEST.warningCount() !== WARNING_TARGET) {
+                    console.log(`Expected ${WARNING_TARGET} warnings, but got ${TEST.warningCount()}`);
+                    if(testColor === "green")
+                    {
+                        testColor = "yellow";
+                    }
+                }
+                document.body.style.backgroundColor = testColor;
+                console.log("\n");
+            }
+
+            window.onload = function(e) {
+                var oldLog = console.log;
+                logElement = document.getElementById("log");
+                console.log = function () {
+                    const params = Array.prototype.slice.call(arguments, 1);
+                    const message = Array.prototype.join.call(arguments, " ");
+                    logElement.value += message + "\n";
+                    oldLog.apply(console, arguments);
+                };
+                runTests();
+            };
+
+            document.getElementById("buttonRun").addEventListener("click", function (e) {
+                runTests();
+            });
+            document.getElementById("buttonClear").addEventListener("click", function (e) {
+                logElement.value = "";
+            });
+        </script>
+    </body>
+</html>
