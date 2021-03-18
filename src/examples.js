@@ -155,8 +155,7 @@ var EXAMPLES = (function () {
                     prevPoint = points[p];
                 }
             }
-            if (spline.isClosed())
-            {
+            if (spline.isClosed()) {
                 this.drawLine(context, prevPoint, spline.segments[0].start(), handleLineStyle);
             }
         }
