@@ -63,12 +63,13 @@ var EXAMPLES = (function () {
         this.thing.render(room, this.program);
     };
 
-    function SplineExample() {
+    function SplineExample(module) {
         this.maximize = false;
         this.updateInDraw = true;
         this.editArea = document.getElementById("points");
         this.editing = false;
         this.editPoint = null;
+        this.R = module;
 
         this.batch = new BLIT.Batch("images/");
         this.vertexImage = this.batch.load("vertex.png");
@@ -81,10 +82,10 @@ var EXAMPLES = (function () {
             spline = new SPLINE.Spline();
 
         spline.addSegment(segment);
-        segment.addPoint(new R3.V(10,  10));
-        segment.addPoint(new R3.V(100, 200));
-        segment.addPoint(new R3.V(200, 100));
-        segment.addPoint(new R3.V(200, 200));
+        segment.addPoint(new this.R.V(10,  10));
+        segment.addPoint(new this.R.V(100, 200));
+        segment.addPoint(new this.R.V(200, 100));
+        segment.addPoint(new this.R.V(200, 200));
 
         this.splines.push(spline);
     }
@@ -105,13 +106,13 @@ var EXAMPLES = (function () {
         }
 
         if (pointer.activated()) {
-            var stab = new R2.V(pointer.location().x, pointer.location().y);
+            var stab = new this.R.V(pointer.location().x, pointer.location().y);
             for (var s = 0; s < this.splines.length; ++s) {
                 var spline = this.splines[s];
                 for (var t = 0; t < spline.segments.length; ++t) {
                     var points = spline.segments[t].points;
                     for (var p = 0; p < points.length; ++p) {
-                        if (R2.pointDistance(points[p], stab) < 10) {
+                        if (this.R.pointDistance(points[p], stab) < 10) {
                             this.editPoint = points[p];
                         }
                     }
@@ -132,7 +133,7 @@ var EXAMPLES = (function () {
     SplineExample.prototype.draw = function (context, width, height) {
         context.clearRect(0, 0, width, height);
 
-        var center = new R2.V(width * 0.5, height * 0.5),
+        var center = new this.R.V(width * 0.5, height * 0.5),
             handleLineStyle = "rgba(0,0,0,0.5)",
             lineStyle = "black";
 
@@ -194,7 +195,7 @@ var EXAMPLES = (function () {
                 spline.addSegment(segment);
                 for (var i = 0; i < points.length; ++i) {
                     var p = points[i];
-                    segment.addPoint(new R3.V(p.x, p.y, p.z, p.w));
+                    segment.addPoint(new this.R.V(p.x, p.y, p.z, p.w));
                 }
             }
         }
