@@ -63,13 +63,13 @@ var EXAMPLES = (function () {
         this.thing.render(room, this.program);
     };
 
-    function SplineExample(module) {
+    function SplineExample(space) {
         this.maximize = false;
         this.updateInDraw = true;
         this.editArea = document.getElementById("points");
         this.editing = false;
         this.editPoint = null;
-        this.R = module;
+        this.Space = space;
 
         this.batch = new BLIT.Batch("images/");
         this.vertexImage = this.batch.load("vertex.png");
@@ -82,16 +82,16 @@ var EXAMPLES = (function () {
             spline = new SPLINE.Spline();
 
         spline.addSegment(segment);
-        segment.addPoint(new this.R.V(10,  10));
-        segment.addPoint(new this.R.V(100, 200));
-        segment.addPoint(new this.R.V(200, 100));
-        segment.addPoint(new this.R.V(200, 200));
+        segment.addPoint(new this.Space.V(10,  10));
+        segment.addPoint(new this.Space.V(100, 200));
+        segment.addPoint(new this.Space.V(200, 100));
+        segment.addPoint(new this.Space.V(200, 200));
 
         this.splines.push(spline);
     }
 
     SplineExample.prototype.update = function (now, elapsed, keyboard, pointer) {
-        if (keyboard.wasAsciiPressed("C")) {
+        if (keyboard.wasAsciiPressed("C") && !keyboard.isCtrlDown()) {
             this.checkpoint();
         }
 
@@ -106,13 +106,13 @@ var EXAMPLES = (function () {
         }
 
         if (pointer.activated()) {
-            var stab = new this.R.V(pointer.location().x, pointer.location().y);
+            var stab = new this.Space.V(pointer.location().x, pointer.location().y);
             for (var s = 0; s < this.splines.length; ++s) {
                 var spline = this.splines[s];
                 for (var t = 0; t < spline.segments.length; ++t) {
                     var points = spline.segments[t].points;
                     for (var p = 0; p < points.length; ++p) {
-                        if (this.R.pointDistance(points[p], stab) < 10) {
+                        if (this.Space.pointDistance(points[p], stab) < 10) {
                             this.editPoint = points[p];
                         }
                     }
@@ -133,21 +133,31 @@ var EXAMPLES = (function () {
     SplineExample.prototype.draw = function (context, width, height) {
         context.clearRect(0, 0, width, height);
 
-        var center = new this.R.V(width * 0.5, height * 0.5),
+        var center = new this.Space.V(width * 0.5, height * 0.5),
             handleLineStyle = "rgba(0,0,0,0.5)",
+            hullLineStyle = "rgba(0,0,0,0.1)",
             lineStyle = "black";
 
         for (var s = 0; s < this.splines.length; ++s) {
             var spline = this.splines[s];
-            this.drawLines(context, spline.build(20), "black");
+            this.drawLines(context, spline.build(100), "black");
+            var prevWasHandle = false;
+            var prevPoint = null;
             for (var t = 0; t < spline.segments.length; ++t) {
                 var points = spline.segments[t].points;
                 for (var p = 0; p < points.length; ++p) {
-                    var isHandle = p == 1 || p == 2;
+                    var isHandle = (p === 0 && t === 0) || (p === (points.length - 1) && (t < spline.segments.length - 1 || !spline.isClosed()));
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
+                    if (p > 0 || t > 0) {
+                        this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleLineStyle : hullLineStyle);
+                    }
+                    prevWasHandle = isHandle;
+                    prevPoint = points[p];
                 }
-                this.drawLine(context, points[0], points[1], handleLineStyle);
-                this.drawLine(context, points[2], points[3], handleLineStyle);
+            }
+            if(spline.isClosed())
+            {
+                this.drawLine(context, prevPoint, spline.segments[0].start(), handleLineStyle);
             }
         }
     };
@@ -186,7 +196,7 @@ var EXAMPLES = (function () {
         var splines = data.splines;
         this.splines = [];
         for (var s = 0; s < splines.length; ++s) {
-            var spline = new SPLINE.Spline(),
+            var spline = new SPLINE.Spline(splines[s].closed),
                 segments = splines[s].segments;
             this.splines.push(spline);
             for (var t = 0; t < segments.length; ++t) {
@@ -195,7 +205,7 @@ var EXAMPLES = (function () {
                 spline.addSegment(segment);
                 for (var i = 0; i < points.length; ++i) {
                     var p = points[i];
-                    segment.addPoint(new this.R.V(p.x, p.y, p.z, p.w));
+                    segment.addPoint(new this.Space.V(p.x, p.y, p.z, p.w));
                 }
             }
         }
