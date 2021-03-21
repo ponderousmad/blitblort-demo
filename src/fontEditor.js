@@ -29,15 +29,15 @@ var GLYPHS = (function () {
     }
 
     FontEditor.prototype.update = function (now, elapsed, keyboard, pointer) {
-        if (keyboard.wasAsciiPressed("C", true)) {
+        if (keyboard.wasAsciiPressed("C", IO.UNMODIFIED)) {
             this.checkpoint();
         }
 
-        if (keyboard.wasAsciiPressed("L", true)) {
+        if (keyboard.wasAsciiPressed("L", IO.UNMODIFIED)) {
             this.loadCheckpoint();
         }
 
-        if (keyboard.wasAsciiPressed("E") && keyboard.isShiftDown()) {
+        if (keyboard.wasAsciiPressed("E", IO.SHIFT)) {
             this.checkpoint();
             this.editing = !this.editing;
             this.editArea.className = this.editing ? "" : "hidden";
