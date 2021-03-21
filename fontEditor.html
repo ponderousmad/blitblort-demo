@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Font Editor</title>
+        <link href="style.css" rel="stylesheet">
+        <script type="text/javascript" src="blitblort/test.js"></script>
+        <script type="text/javascript" src="blitblort/blit.js"></script>
+        <script type="text/javascript" src="blitblort/tick.js"></script>
+        <script type="text/javascript" src="blitblort/blort.js"></script>
+        <script type="text/javascript" src="blitblort/io.js"></script>
+        <script type="text/javascript" src="blitblort/r2.js"></script>
+        <script type="text/javascript" src="blitblort/r3.js"></script>
+        <script type="text/javascript" src="blitblort/spline.js"></script>
+        <script type="text/javascript" src="blitblort/improc.js"></script>
+        <script type="text/javascript" src="blitblort/main.js"></script>
+        <script type="text/javascript" src="src/fontEditor.js"></script>
+    </head>
+    <body>
+        <div>
+            <span>
+                <canvas id="canvas2D" width="800" height="800">
+                    Sorry, your browser doesn't support the &lt;canvas&gt; element.
+                </canvas>
+            </span>
+            <textarea id="points" rows="50" cols="80">
+            </textarea>
+            <button id="buttonLoad" type="button" class="beside">Load</button>
+            <button id="buttonSave" type="button" class="beside">Save</button>
+        </div>
+        <script type="text/javascript">
+            window.onload = function(e) {
+                MAIN.runTestSuites();
+                var example = new GLYPHS.FontEditor();
+                MAIN.start(document.getElementById("canvas2D"), example);
+            };
+        </script>
+    </body>
+</html>
