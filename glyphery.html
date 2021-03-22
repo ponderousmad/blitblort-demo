@@ -14,7 +14,7 @@
         <script type="text/javascript" src="blitblort/spline.js"></script>
         <script type="text/javascript" src="blitblort/improc.js"></script>
         <script type="text/javascript" src="blitblort/main.js"></script>
-        <script type="text/javascript" src="src/fontEditor.js"></script>
+        <script type="text/javascript" src="src/glyphery.js"></script>
     </head>
     <body>
         <div>
@@ -31,8 +31,8 @@
         <script type="text/javascript">
             window.onload = function(e) {
                 MAIN.runTestSuites();
-                var example = new GLYPHS.FontEditor();
-                MAIN.start(document.getElementById("canvas2D"), example);
+                var editor = new GLYPHERY.Editor();
+                MAIN.start(document.getElementById("canvas2D"), editor);
             };
         </script>
     </body>

@@ -1,7 +1,7 @@
-var GLYPHS = (function () {
+var GLYPHERY = (function () {
     "use strict";
 
-    function FontEditor() {
+    function Editor() {
         this.maximize = false;
         this.updateInDraw = true;
         this.editArea = document.getElementById("points");
@@ -28,7 +28,7 @@ var GLYPHS = (function () {
         this.splines.push(spline);
     }
 
-    FontEditor.prototype.update = function (now, elapsed, keyboard, pointer) {
+    Editor.prototype.update = function (now, elapsed, keyboard, pointer) {
         if (keyboard.wasAsciiPressed("C", IO.UNMODIFIED)) {
             this.checkpoint();
         }
@@ -68,7 +68,7 @@ var GLYPHS = (function () {
         }
     };
     
-    FontEditor.prototype.draw = function (context, width, height) {
+    Editor.prototype.draw = function (context, width, height) {
         context.clearRect(0, 0, width, height);
 
         var center = new this.Space.V(width * 0.5, height * 0.5),
@@ -99,18 +99,18 @@ var GLYPHS = (function () {
         }
     };
 
-    FontEditor.prototype.drawVertex = function (context, location, tint) { 
+    Editor.prototype.drawVertex = function (context, location, tint) { 
         if (this.batch.loaded) {
             BLIT.draw(context, this.vertexImage, location.x, location.y, BLIT.ALIGN.Center, null, null, BLIT.MIRROR.None, tint);
             BLIT.draw(context, this.vertexShadow, location.x, location.y, BLIT.ALIGN.Center);
         }
     };
     
-    FontEditor.prototype.drawLine = function (context, start, end, style) {
+    Editor.prototype.drawLine = function (context, start, end, style) {
         this.drawLines(context, [start, end], style);
     };
 
-    FontEditor.prototype.drawLines = function (context, points, style) {
+    Editor.prototype.drawLines = function (context, points, style) {
         context.save();
         context.strokeStyle = style || "rgba(0,0,0,.5)";
         context.beginPath();
@@ -122,14 +122,14 @@ var GLYPHS = (function () {
         context.restore();
     };
 
-    FontEditor.prototype.save = function () {
+    Editor.prototype.save = function () {
         var data = {
             splines: this.splines
         };
         return JSON.stringify(data, null, 4);
     };
 
-    FontEditor.prototype.load = function (data) {
+    Editor.prototype.load = function (data) {
         var splines = data.splines;
         this.splines = [];
         for (var s = 0; s < splines.length; ++s) {
@@ -148,16 +148,16 @@ var GLYPHS = (function () {
         }
     };
 
-    FontEditor.prototype.checkpoint = function () {
+    Editor.prototype.checkpoint = function () {
         this.editArea.value = this.save();
     };
 
-    FontEditor.prototype.loadCheckpoint = function () {
+    Editor.prototype.loadCheckpoint = function () {
         var data = JSON.parse(this.editArea.value);
         this.load(data);
     };
 
     return {
-        FontEditor: FontEditor
+        Editor: Editor
     };
 }());
