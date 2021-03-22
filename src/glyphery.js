@@ -1,6 +1,24 @@
 var GLYPHERY = (function () {
     "use strict";
 
+    function SnapLine(origin, axis) {
+        this.origin = origin;
+        this.axis = axis;
+        this.style = "rgba(0,0,0.2,.5)";
+        this.dash = [10, 2, 5, 2];
+    }
+
+    SnapLine.prototype.draw = function(context, width, height) {
+        context.save();
+        context.strokeStyle = this.style;
+        context.setLineDash(this.dash);
+        context.beginPath();
+        context.moveTo(this.origin.x, this.origin.y);
+        context.lineTo(this.origin.x + width * this.axis.x, this.origin.y + height * this.axis.y);
+        context.stroke();
+        context.restore();
+    };
+
     function Editor() {
         this.maximize = false;
         this.updateInDraw = true;
@@ -8,6 +26,12 @@ var GLYPHERY = (function () {
         this.editing = false;
         this.editPoint = null;
         this.Space = R2;
+        this.snaps = [
+            new SnapLine(new R2.V(0, 20), new R2.V(1, 0)),
+            new SnapLine(new R2.V(0, 100), new R2.V(1, 0)),
+            new SnapLine(new R2.V(0, 180), new R2.V(1, 0)),
+            new SnapLine(new R2.V(20, 0), new R2.V(0, 1))
+        ];
 
         this.batch = new BLIT.Batch("images/");
         this.vertexImage = this.batch.load("vertex.png");
@@ -75,6 +99,10 @@ var GLYPHERY = (function () {
             handleLineStyle = "rgba(0,0,0,0.5)",
             hullLineStyle = "rgba(0,0,0,0.1)",
             lineStyle = "black";
+
+        for (var snap = 0; snap < this.snaps.length; ++snap) {
+            this.snaps[snap].draw(context, width, height);
+        }
 
         for (var s = 0; s < this.splines.length; ++s) {
             var spline = this.splines[s];
