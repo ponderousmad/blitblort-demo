@@ -48,12 +48,12 @@ var JOURNAL = (function (SCRUB) {
     };
 
     Editor.prototype.save = function () {
-        var fileContent = JSON.stringify(this.content);
-        var bb = new Blob([fileContent ], { type: 'text/plain' });
+        var blob = new Blob([JSON.stringify(this.content)], { type: 'application/json' });
         var a = document.createElement('a');
         a.download = 'journal.json';
-        a.href = window.URL.createObjectURL(bb);
+        a.href = window.URL.createObjectURL(blob);
         a.click();
+        window.URL.revokeObjectURL(blob);
     };
 
     Editor.prototype.checkpoint = function () {
