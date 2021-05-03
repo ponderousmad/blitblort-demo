@@ -76,18 +76,18 @@ var EXAMPLES = (function () {
         this.vertexShadow = this.batch.load("vertexShadow.png");
         this.batch.commit();
 
-        this.splines = [];
+        this.paths = [];
 
         var segment = new SPLINE.BezierCurve(),
-            spline = new SPLINE.Spline();
+            path = new SPLINE.Path();
 
-        spline.addSegment(segment);
+        path.addSegment(segment);
         segment.addPoint(new this.Space.V(10,  10));
         segment.addPoint(new this.Space.V(100, 200));
         segment.addPoint(new this.Space.V(200, 100));
         segment.addPoint(new this.Space.V(200, 200));
 
-        this.splines.push(spline);
+        this.paths.push(path);
     }
 
     SplineExample.prototype.update = function (now, elapsed, keyboard, pointer) {
@@ -107,8 +107,8 @@ var EXAMPLES = (function () {
 
         if (pointer.activated()) {
             var stab = new this.Space.V(pointer.location().x, pointer.location().y);
-            for (var s = 0; s < this.splines.length; ++s) {
-                var spline = this.splines[s];
+            for (var s = 0; s < this.paths.length; ++s) {
+                var spline = this.paths[s];
                 for (var t = 0; t < spline.segments.length; ++t) {
                     var points = spline.segments[t].points;
                     for (var p = 0; p < points.length; ++p) {
@@ -138,8 +138,8 @@ var EXAMPLES = (function () {
             hullLineStyle = "rgba(0,0,0,0.1)",
             lineStyle = "black";
 
-        for (var s = 0; s < this.splines.length; ++s) {
-            var spline = this.splines[s];
+        for (var s = 0; s < this.paths.length; ++s) {
+            var spline = this.paths[s];
             this.drawLines(context, spline.build(100), "black");
             var prevWasHandle = false;
             var prevPoint = null;
@@ -186,24 +186,24 @@ var EXAMPLES = (function () {
 
     SplineExample.prototype.save = function () {
         var data = {
-            splines: this.splines
+            paths: this.paths
         };
         return JSON.stringify(data, null, 4);
     };
 
     SplineExample.prototype.load = function (data) {
-        var splines = data.splines;
-        this.splines = [];
-        for (var s = 0; s < splines.length; ++s) {
-            var spline = new SPLINE.Spline(splines[s].closed),
-                segments = splines[s].segments;
-            this.splines.push(spline);
-            for (var t = 0; t < segments.length; ++t) {
+        var paths = data.paths;
+        this.paths = [];
+        for (var i = 0; i < paths.length; ++i) {
+            var path = new SPLINE.Path(paths[i].closed),
+                segments = paths[i].segments;
+            this.paths.push(path);
+            for (var s = 0; s < segments.length; ++s) {
                 var segment = new SPLINE.BezierCurve(),
-                    points = segments[t].points;
-                spline.addSegment(segment);
-                for (var i = 0; i < points.length; ++i) {
-                    var p = points[i];
+                    points = segments[s].points;
+                path.addSegment(segment);
+                for (var j = 0; j < points.length; ++j) {
+                    var p = points[j];
                     segment.addPoint(new this.Space.V(p.x, p.y, p.z, p.w));
                 }
             }

@@ -38,18 +38,18 @@ var GLYPHERY = (function () {
         this.vertexShadow = this.batch.load("vertexShadow.png");
         this.batch.commit();
 
-        this.splines = [];
+        this.paths = [];
 
         var segment = new SPLINE.BezierCurve(),
-            spline = new SPLINE.Spline();
+            path = new SPLINE.Path();
 
-        spline.addSegment(segment);
+        path.addSegment(segment);
         segment.addPoint(new this.Space.V(10,  10));
         segment.addPoint(new this.Space.V(100, 200));
         segment.addPoint(new this.Space.V(200, 100));
         segment.addPoint(new this.Space.V(200, 200));
 
-        this.splines.push(spline);
+        this.paths.push(path);
     }
 
     Editor.prototype.update = function (now, elapsed, keyboard, pointer) {
@@ -69,10 +69,10 @@ var GLYPHERY = (function () {
 
         if (pointer.activated()) {
             var stab = new this.Space.V(pointer.location().x, pointer.location().y);
-            for (var s = 0; s < this.splines.length; ++s) {
-                var spline = this.splines[s];
-                for (var t = 0; t < spline.segments.length; ++t) {
-                    var points = spline.segments[t].points;
+            for (var i = 0; i < this.paths.length; ++i) {
+                var path = this.paths[i];
+                for (var s = 0; s < path.segments.length; ++s) {
+                    var points = path.segments[s].points;
                     for (var p = 0; p < points.length; ++p) {
                         if (this.Space.pointDistance(points[p], stab) < 10) {
                             this.editPoint = points[p];
@@ -104,25 +104,25 @@ var GLYPHERY = (function () {
             this.snaps[snap].draw(context, width, height);
         }
 
-        for (var s = 0; s < this.splines.length; ++s) {
-            var spline = this.splines[s];
-            this.drawLines(context, spline.build(100), "black");
+        for (var i = 0; i < this.paths.length; ++i) {
+            var path = this.paths[i];
+            this.drawLines(context, path.build(100), "black");
             var prevWasHandle = false;
             var prevPoint = null;
-            for (var t = 0; t < spline.segments.length; ++t) {
-                var points = spline.segments[t].points;
+            for (var s = 0; s < path.segments.length; ++s) {
+                var points = path.segments[s].points;
                 for (var p = 0; p < points.length; ++p) {
-                    var isHandle = (p === 0 && t === 0) || (p === (points.length - 1) && (t < spline.segments.length - 1 || !spline.isClosed()));
+                    var isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
-                    if (p > 0 || t > 0) {
+                    if (p > 0 || s > 0) {
                         this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleLineStyle : hullLineStyle);
                     }
                     prevWasHandle = isHandle;
                     prevPoint = points[p];
                 }
             }
-            if (spline.isClosed()) {
-                this.drawLine(context, prevPoint, spline.segments[0].start(), handleLineStyle);
+            if (path.isClosed()) {
+                this.drawLine(context, prevPoint, path.segments[0].start(), handleLineStyle);
             }
         }
     };
@@ -152,24 +152,24 @@ var GLYPHERY = (function () {
 
     Editor.prototype.save = function () {
         var data = {
-            splines: this.splines
+            paths: this.paths
         };
         return JSON.stringify(data, null, 4);
     };
 
     Editor.prototype.load = function (data) {
-        var splines = data.splines;
-        this.splines = [];
-        for (var s = 0; s < splines.length; ++s) {
-            var spline = new SPLINE.Spline(splines[s].closed),
-                segments = splines[s].segments;
-            this.splines.push(spline);
+        var paths = data.paths;
+        this.paths = [];
+        for (var i = 0; i < paths.length; ++i) {
+            var path = new SPLINE.Path(paths[i].closed),
+                segments = paths[i].segments;
+            this.paths.push(path);
             for (var t = 0; t < segments.length; ++t) {
                 var segment = new SPLINE.BezierCurve(),
                     points = segments[t].points;
-                spline.addSegment(segment);
-                for (var i = 0; i < points.length; ++i) {
-                    var p = points[i];
+                path.addSegment(segment);
+                for (var j = 0; j < points.length; ++j) {
+                    var p = points[j];
                     segment.addPoint(new this.Space.V(p.x, p.y, p.z, p.w));
                 }
             }
