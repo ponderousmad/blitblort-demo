@@ -382,7 +382,7 @@ var BLUMP_EDIT = (function () {
             }, false);
 
             try {
-                editArea.value = window.localStorage.getItem("blump");
+                this.editArea.value = window.localStorage.getItem("blump");
             } catch (error) {
                 console.log("Error loading blump: " + error);
             }
