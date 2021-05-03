@@ -41,7 +41,7 @@ var EXAMPLES = (function () {
         this.program = room.programFromElements("vertex-test", "fragment-test", true, true, true);
         this.batch = new BLIT.Batch("images/");
 
-        var mesh = WGL.makePlane(WGL.uvFill());
+        var mesh = GEO.makePlane(WGL.uvFill());
         mesh.image = this.batch.load("uv.png");
         this.batch.commit();
         this.thing = new BLOB.Thing(mesh);
