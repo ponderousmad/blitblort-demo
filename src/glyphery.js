@@ -84,7 +84,7 @@ var GLYPHERY = (function () {
         this.vertexShadow = this.batch.load("vertexShadow.png");
         this.batch.commit();
 
-        this.paths = [];
+        this.font = new GLYPH.Font();
 
         var segment = new SPLINE.BezierCurve(),
             path = new SPLINE.Path();
@@ -95,7 +95,16 @@ var GLYPHERY = (function () {
         segment.addPoint(new this.Space.V(200, 100));
         segment.addPoint(new this.Space.V(200, 200));
 
-        this.paths.push(path);
+        this.editCodePoint = "A".codePointAt(0);
+        this.font.newGlyph(this.editCodePoint, [path]);
+
+        var editor = this;
+        document.getElementById("buttonSave").addEventListener("click", function() {
+            editor.checkpoint();
+        }, false);
+        document.getElementById("buttonLoad").addEventListener("click", function() {
+            editor.loadCheckpoint();
+        }, false);
     }
 
     Editor.prototype.snap = function (point, snapDistance) {
@@ -107,24 +116,12 @@ var GLYPHERY = (function () {
     }
 
     Editor.prototype.update = function (now, elapsed, keyboard, pointer) {
-        if (keyboard.wasAsciiPressed("C", IO.UNMODIFIED)) {
-            this.checkpoint();
-        }
-
-        if (keyboard.wasAsciiPressed("L", IO.UNMODIFIED)) {
-            this.loadCheckpoint();
-        }
-
-        if (keyboard.wasAsciiPressed("E", IO.SHIFT)) {
-            this.checkpoint();
-            this.editing = !this.editing;
-            this.editArea.className = this.editing ? "" : "hidden";
-        }
-
+        let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
+            paths = editGlyph.getSplines();
         if (pointer.activated()) {
             var stab = new this.Space.V(pointer.location().x, pointer.location().y);
-            for (var i = 0; i < this.paths.length; ++i) {
-                var path = this.paths[i];
+            for (var i = 0; i < paths.length; ++i) {
+                var path = paths[i];
                 for (var s = 0; s < path.segments.length; ++s) {
                     var points = path.segments[s].points;
                     for (var p = 0; p < points.length; ++p) {
@@ -148,44 +145,44 @@ var GLYPHERY = (function () {
             }
         }
     };
+
+    Editor.prototype.drawPath = function (context, path, lineStyle, handleStyle, hullStyle) {
+        this.drawLines(context, path.build(100), lineStyle);
+        var prevWasHandle = false;
+        var prevPoint = null;
+        for (var s = 0; s < path.segments.length; ++s) {
+            var points = path.segments[s].points;
+            for (var p = 0; p < points.length; ++p) {
+                var isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
+                this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
+                if (p > 0 || s > 0) {
+                    this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleStyle : hullStyle);
+                }
+                if (points[p] == this.editPoint) {
+                    for (var snap = 0; snap < this.snaps.length; ++snap) {
+                        this.snaps[snap].drawSnap(context, points[p], this.snapDistance, 20);
+                    }
+                }
+                prevWasHandle = isHandle;
+                prevPoint = points[p];
+            }
+        }
+        if (path.isClosed()) {
+            this.drawLine(context, prevPoint, path.segments[0].start(), handleStyle);
+        }
+    };
     
     Editor.prototype.draw = function (context, width, height) {
         context.clearRect(0, 0, width, height);
-
-        var center = new this.Space.V(width * 0.5, height * 0.5),
-            handleLineStyle = "rgba(0,0,0,0.5)",
-            hullLineStyle = "rgba(0,0,0,0.1)",
-            lineStyle = "black";
 
         for (var snap = 0; snap < this.snaps.length; ++snap) {
             this.snaps[snap].draw(context, width, height);
         }
 
-        for (var i = 0; i < this.paths.length; ++i) {
-            var path = this.paths[i];
-            this.drawLines(context, path.build(100), "black");
-            var prevWasHandle = false;
-            var prevPoint = null;
-            for (var s = 0; s < path.segments.length; ++s) {
-                var points = path.segments[s].points;
-                for (var p = 0; p < points.length; ++p) {
-                    var isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
-                    this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
-                    if (p > 0 || s > 0) {
-                        this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleLineStyle : hullLineStyle);
-                    }
-                    if (points[p] == this.editPoint) {
-                        for (var snap = 0; snap < this.snaps.length; ++snap) {
-                            this.snaps[snap].drawSnap(context, points[p], this.snapDistance, 20);
-                        }
-                    }
-                    prevWasHandle = isHandle;
-                    prevPoint = points[p];
-                }
-            }
-            if (path.isClosed()) {
-                this.drawLine(context, prevPoint, path.segments[0].start(), handleLineStyle);
-            }
+        let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
+            paths = editGlyph.getSplines();
+        for (let p = 0; p < paths.length; ++p) {
+            this.drawPath(context, paths[p], "black", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.1)");
         }
     };
 
@@ -212,39 +209,12 @@ var GLYPHERY = (function () {
         context.restore();
     };
 
-    Editor.prototype.save = function () {
-        var data = {
-            paths: this.paths
-        };
-        return JSON.stringify(data, null, 4);
-    };
-
-    Editor.prototype.load = function (data) {
-        var paths = data.paths;
-        this.paths = [];
-        for (var i = 0; i < paths.length; ++i) {
-            var path = new SPLINE.Path(paths[i].closed),
-                segments = paths[i].segments;
-            this.paths.push(path);
-            for (var t = 0; t < segments.length; ++t) {
-                var segment = new SPLINE.BezierCurve(),
-                    points = segments[t].points;
-                path.addSegment(segment);
-                for (var j = 0; j < points.length; ++j) {
-                    var p = points[j];
-                    segment.addPoint(new this.Space.V(p.x, p.y, p.z, p.w));
-                }
-            }
-        }
-    };
-
     Editor.prototype.checkpoint = function () {
-        this.editArea.value = this.save();
+        this.editArea.value = this.font.asJSONString();
     };
 
     Editor.prototype.loadCheckpoint = function () {
-        var data = JSON.parse(this.editArea.value);
-        this.load(data);
+        this.font.loadFromJSON(this.editArea.value);
     };
 
     return {
