@@ -3,12 +3,12 @@ var GLYPHERY = (function () {
 
     function SnapLine(origin, axis) {
         this.origin = origin;
-        this.axis = axis;
+        this.axis = axis.normalized();
         this.style = "rgba(0,0,0.2,.5)";
         this.dash = [10, 2, 5, 2];
     }
 
-    SnapLine.prototype.draw = function(context, width, height) {
+    SnapLine.prototype.draw = function (context, width, height) {
         context.save();
         context.strokeStyle = this.style;
         context.setLineDash(this.dash);
@@ -19,6 +19,50 @@ var GLYPHERY = (function () {
         context.restore();
     };
 
+    SnapLine.prototype.snap = function (point, snapDistance) {
+        // Avoid numerical issues for strictly vertical/horizontal
+        if (this.axis.x === 0) {
+            if (Math.abs(this.origin.x - point.x) <= snapDistance) {
+                return new R2.V(this.origin.x, point.y);
+            }
+        } else if (this.axis.y === 0) {
+            if (Math.abs(this.origin.y - point.y) <= snapDistance) {
+                return new R2.V(point.x, this.origin.y);
+            }
+        } else {
+            // Construct the line segment from the point to the snap origin.
+            var offset = R2.subVectors(point, this.origin),
+            // Project that segment onto the axis direction.
+                projectedOffset = this.axis.scaled(offset.dot(this.axis));
+            offset.sub(projectedOffset);
+            
+            // If the length of that segment is less or equal to the snap distance, add it to the point.
+            if (offset.lengthSq() <= snapDistance * snapDistance) {
+                return R2.subVectors(point, offset);
+            }
+        }
+        return point;
+    }
+
+    SnapLine.prototype.drawSnap = function (context, point, snapDistance, drawDistance) {
+        var drawSnapped = this.snap(point, drawDistance),
+            snapToleranceSq = 0.0001;
+        if (point == drawSnapped) {
+            return;
+        }
+        context.save();
+        if (R2.pointDistanceSq(drawSnapped, this.snap(point, snapDistance)) < snapToleranceSq) {
+            context.strokeStyle = "rgba(0,255,0,0.5)";
+        } else {
+            context.strokeStyle = "rgba(255,0,0,0.25)";
+        }
+        context.beginPath();
+        context.moveTo(point.x, point.y);
+        context.lineTo(drawSnapped.x, drawSnapped.y);
+        context.stroke();
+        context.restore();
+    }
+
     function Editor() {
         this.maximize = false;
         this.updateInDraw = true;
@@ -27,11 +71,13 @@ var GLYPHERY = (function () {
         this.editPoint = null;
         this.Space = R2;
         this.snaps = [
+            new SnapLine(new R2.V(0, 0), new R2.V(1, 1)),
             new SnapLine(new R2.V(0, 20), new R2.V(1, 0)),
             new SnapLine(new R2.V(0, 100), new R2.V(1, 0)),
             new SnapLine(new R2.V(0, 180), new R2.V(1, 0)),
             new SnapLine(new R2.V(20, 0), new R2.V(0, 1))
         ];
+        this.snapDistance = 4;
 
         this.batch = new BLIT.Batch("images/");
         this.vertexImage = this.batch.load("vertex.png");
@@ -50,6 +96,14 @@ var GLYPHERY = (function () {
         segment.addPoint(new this.Space.V(200, 200));
 
         this.paths.push(path);
+    }
+
+    Editor.prototype.snap = function (point, snapDistance) {
+        var snapped = point;
+        for (var s = 0; s < this.snaps.length; ++s) {
+            snapped = this.snaps[s].snap(snapped, snapDistance);
+        }
+        return snapped;
     }
 
     Editor.prototype.update = function (now, elapsed, keyboard, pointer) {
@@ -84,8 +138,11 @@ var GLYPHERY = (function () {
 
         if (this.editPoint) {
             if (pointer.primary) {
-                this.editPoint.x = pointer.location().x;
-                this.editPoint.y = pointer.location().y;
+                var stab = new this.Space.V(pointer.location().x, pointer.location().y);
+                if (keyboard.isCtrlDown()) {
+                    stab = this.snap(stab, this.snapDistance);
+                }
+                this.editPoint.copy(stab);
             } else {
                 this.editPoint = null;
             }
@@ -116,6 +173,11 @@ var GLYPHERY = (function () {
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
                     if (p > 0 || s > 0) {
                         this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleLineStyle : hullLineStyle);
+                    }
+                    if (points[p] == this.editPoint) {
+                        for (var snap = 0; snap < this.snaps.length; ++snap) {
+                            this.snaps[snap].drawSnap(context, points[p], this.snapDistance, 20);
+                        }
                     }
                     prevWasHandle = isHandle;
                     prevPoint = points[p];
