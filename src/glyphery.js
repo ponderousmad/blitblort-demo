@@ -72,7 +72,7 @@ let GLYPHERY = (function () {
             super();
             this.maximize = false;
             this.updateInDraw = true;
-            this.editArea = document.getElementById("points");
+            this.fontEditArea = document.getElementById("fontData");
             this.snaps = [
                 new SnapLine(new R2.V(0, 0), new R2.V(1, 1)),
                 new SnapLine(new R2.V(0, 20), new R2.V(1, 0)),
@@ -129,6 +129,8 @@ let GLYPHERY = (function () {
             document.getElementById("buttonLoad").addEventListener("click", function() {
                 editor.loadCheckpoint();
             }, false);
+
+            this.checkpoint();
         }
 
         snap(point, snapDistance) {
@@ -259,11 +261,11 @@ let GLYPHERY = (function () {
         }
 
         checkpoint() {
-            this.editArea.value = this.font.asJSONString();
+            this.fontEditArea.value = this.font.asJSONString();
         }
 
         loadCheckpoint() {
-            this.font.loadFromJSON(this.editArea.value);
+            this.font.loadFromJSON(this.fontEditArea.value);
         }
     }
 
