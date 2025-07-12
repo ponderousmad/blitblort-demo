@@ -82,6 +82,7 @@ let GLYPHERY = (function () {
             ];
             this.snapDistance = 4;
             this.tesselation = 20;
+            this.hoverPoint = new R2.V(0, 0);
 
             this.batch = new BLIT.Batch("images/");
             this.vertexImage = this.batch.load("vertex.png");
@@ -144,6 +145,8 @@ let GLYPHERY = (function () {
         update(now, elapsed, keyboard, pointer) {
             let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
                 paths = editGlyph.getSplines();
+            this.hoverPoint = new R2.V(pointer.hoverLocation().x, pointer.hoverLocation().y);
+
             if (pointer.activated()) {
                 let stab = new R2.V(pointer.location().x, pointer.location().y);
                 for (let i = 0; i < paths.length; ++i) {
@@ -175,9 +178,9 @@ let GLYPHERY = (function () {
             }
         }
 
-        drawPath(context, path, lineStyle, handleStyle, hullStyle) {
+        drawPath(context, path, points, lineStyle, handleStyle, hullStyle) {
             if (!path.isClosed()) {
-                this.drawLines(context, path.build(this.tesselation), lineStyle);
+                this.drawLines(context, points, lineStyle);
             }
             let prevWasHandle = false;
             let prevPoint = null;
@@ -203,19 +206,14 @@ let GLYPHERY = (function () {
             }
         }
 
-        fillPath(context, path, fillStyle) {
-            if (!path.isClosed()) {
-                return;
-            }
+        fillPath(context, path, points, fillStyle) {
             context.save();
-            context.fillSyle = fillStyle;
+            context.fillStyle = fillStyle;
             context.beginPath();
 
-            let points = path.build(this.tesselation);
-
             context.moveTo(points[0].x, points[0].y);
-            for (let p = 1; p < points.length; ++p) {
-                context.lineTo(points[p].x, points[p].y);
+            for (const point of points) {
+                context.lineTo(point.x, point.y);
             }
 
             context.fill();
@@ -225,15 +223,19 @@ let GLYPHERY = (function () {
         draw(context, width, height) {
             context.clearRect(0, 0, width, height);
 
-            for (let snap = 0; snap < this.snaps.length; ++snap) {
-                this.snaps[snap].draw(context, width, height);
+            for (const snap of this.snaps) {
+                snap.draw(context, width, height);
             }
 
             let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
                 paths = editGlyph.getSplines();
-            for (let p = 0; p < paths.length; ++p) {
-                this.fillPath(context, paths[p], "rgba(0,0,0,0.1)");
-                this.drawPath(context, paths[p], "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
+            for (const path of paths) {
+                let points = path.build(this.tesselation);
+                if (path.isClosed()) {
+                    let fillStyle = GLYPH.isInsidePolygon(points, this.hoverPoint) ? "rgba(0,64,0,0.1)" : "rgba(64,0,0, 0.1)";
+                    this.fillPath(context, path, points, fillStyle);
+                }
+                this.drawPath(context, path, points, "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
             }
         }
 
