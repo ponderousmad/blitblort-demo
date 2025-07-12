@@ -1,4 +1,4 @@
-var GLYPHERY = (function () {
+let GLYPHERY = (function () {
     "use strict";
 
     function SnapLine(origin, axis) {
@@ -31,7 +31,7 @@ var GLYPHERY = (function () {
             }
         } else {
             // Construct the line segment from the point to the snap origin.
-            var offset = R2.subVectors(point, this.origin),
+            let offset = R2.subVectors(point, this.origin),
             // Project that segment onto the axis direction.
                 projectedOffset = this.axis.scaled(offset.dot(this.axis));
             offset.sub(projectedOffset);
@@ -45,7 +45,7 @@ var GLYPHERY = (function () {
     }
 
     SnapLine.prototype.drawSnap = function (context, point, snapDistance, drawDistance) {
-        var drawSnapped = this.snap(point, drawDistance),
+        let drawSnapped = this.snap(point, drawDistance),
             snapToleranceSq = 0.0001;
         if (point == drawSnapped) {
             return;
@@ -67,9 +67,6 @@ var GLYPHERY = (function () {
         this.maximize = false;
         this.updateInDraw = true;
         this.editArea = document.getElementById("points");
-        this.editing = false;
-        this.editPoint = null;
-        this.Space = R2;
         this.snaps = [
             new SnapLine(new R2.V(0, 0), new R2.V(1, 1)),
             new SnapLine(new R2.V(0, 20), new R2.V(1, 0)),
@@ -78,6 +75,7 @@ var GLYPHERY = (function () {
             new SnapLine(new R2.V(20, 0), new R2.V(0, 1))
         ];
         this.snapDistance = 4;
+        this.tesselation = 20;
 
         this.batch = new BLIT.Batch("images/");
         this.vertexImage = this.batch.load("vertex.png");
@@ -86,19 +84,39 @@ var GLYPHERY = (function () {
 
         this.font = new GLYPH.Font();
 
-        var segment = new SPLINE.BezierCurve(),
-            path = new SPLINE.Path();
+        let path = new SPLINE.Path(true),
+            segment = new SPLINE.BezierCurve();
 
         path.addSegment(segment);
-        segment.addPoint(new this.Space.V(10,  10));
-        segment.addPoint(new this.Space.V(100, 200));
-        segment.addPoint(new this.Space.V(200, 100));
-        segment.addPoint(new this.Space.V(200, 200));
+        segment.addPoint(new R2.V(20,  20));
+        segment.addPoint(new R2.V(50,  20));
+        segment.addPoint(new R2.V(90,  20));
+        segment.addPoint(new R2.V(120, 20));
+
+        segment = new SPLINE.BezierCurve();
+        path.addSegment(segment);
+        segment.addPoint(new R2.V(120, 60));
+        segment.addPoint(new R2.V(120, 140));
+        segment.addPoint(new R2.V(120, 180));
+
+        segment = new SPLINE.BezierCurve();
+        path.addSegment(segment);
+        segment.addPoint(new R2.V(90, 180));
+        segment.addPoint(new R2.V(50, 180));
+        segment.addPoint(new R2.V(20, 180));
+
+        segment = new SPLINE.BezierCurve();
+        path.addSegment(segment);
+        segment.addPoint(new R2.V(20, 140));
+        segment.addPoint(new R2.V(20, 60));
 
         this.editCodePoint = "A".codePointAt(0);
+        this.editSpline = 0;
+        this.editSegment = 0;
+        this.editPoint = null;
         this.font.newGlyph(this.editCodePoint, [path]);
 
-        var editor = this;
+        let editor = this;
         document.getElementById("buttonSave").addEventListener("click", function() {
             editor.checkpoint();
         }, false);
@@ -108,8 +126,8 @@ var GLYPHERY = (function () {
     }
 
     Editor.prototype.snap = function (point, snapDistance) {
-        var snapped = point;
-        for (var s = 0; s < this.snaps.length; ++s) {
+        let snapped = point;
+        for (let s = 0; s < this.snaps.length; ++s) {
             snapped = this.snaps[s].snap(snapped, snapDistance);
         }
         return snapped;
@@ -119,13 +137,13 @@ var GLYPHERY = (function () {
         let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
             paths = editGlyph.getSplines();
         if (pointer.activated()) {
-            var stab = new this.Space.V(pointer.location().x, pointer.location().y);
-            for (var i = 0; i < paths.length; ++i) {
-                var path = paths[i];
-                for (var s = 0; s < path.segments.length; ++s) {
-                    var points = path.segments[s].points;
-                    for (var p = 0; p < points.length; ++p) {
-                        if (this.Space.pointDistance(points[p], stab) < 10) {
+            let stab = new R2.V(pointer.location().x, pointer.location().y);
+            for (let i = 0; i < paths.length; ++i) {
+                let path = paths[i];
+                for (let s = 0; s < path.segments.length; ++s) {
+                    let points = path.segments[s].points;
+                    for (let p = 0; p < points.length; ++p) {
+                        if (R2.pointDistance(points[p], stab) < 10) {
                             this.editPoint = points[p];
                         }
                     }
@@ -133,9 +151,12 @@ var GLYPHERY = (function () {
             }
         }
 
+        if (keyboard.isKeyDown(POKI.KEYS.GT)) {
+        }
+
         if (this.editPoint) {
             if (pointer.primary) {
-                var stab = new this.Space.V(pointer.location().x, pointer.location().y);
+                let stab = new R2.V(pointer.location().x, pointer.location().y);
                 if (keyboard.isCtrlDown()) {
                     stab = this.snap(stab, this.snapDistance);
                 }
@@ -147,19 +168,21 @@ var GLYPHERY = (function () {
     };
 
     Editor.prototype.drawPath = function (context, path, lineStyle, handleStyle, hullStyle) {
-        this.drawLines(context, path.build(100), lineStyle);
-        var prevWasHandle = false;
-        var prevPoint = null;
-        for (var s = 0; s < path.segments.length; ++s) {
-            var points = path.segments[s].points;
-            for (var p = 0; p < points.length; ++p) {
-                var isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
+        if (!path.isClosed()) {
+            this.drawLines(context, path.build(this.tesselation), lineStyle);
+        }
+        let prevWasHandle = false;
+        let prevPoint = null;
+        for (let s = 0; s < path.segments.length; ++s) {
+            let points = path.segments[s].points;
+            for (let p = 0; p < points.length; ++p) {
+                let isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
                 this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
                 if (p > 0 || s > 0) {
                     this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleStyle : hullStyle);
                 }
                 if (points[p] == this.editPoint) {
-                    for (var snap = 0; snap < this.snaps.length; ++snap) {
+                    for (let snap = 0; snap < this.snaps.length; ++snap) {
                         this.snaps[snap].drawSnap(context, points[p], this.snapDistance, 20);
                     }
                 }
@@ -171,18 +194,38 @@ var GLYPHERY = (function () {
             this.drawLine(context, prevPoint, path.segments[0].start(), handleStyle);
         }
     };
+
+    Editor.prototype.fillPath = function (context, path, fillStyle) {
+        if (!path.isClosed()) {
+            return;
+        }
+        context.save();
+        context.fillSyle = fillStyle;
+        context.beginPath();
+
+        let points = path.build(this.tesselation);
+
+        context.moveTo(points[0].x, points[0].y);
+        for (let p = 1; p < points.length; ++p) {
+            context.lineTo(points[p].x, points[p].y);
+        }
+
+        context.fill();
+        context.restore();
+    }
     
     Editor.prototype.draw = function (context, width, height) {
         context.clearRect(0, 0, width, height);
 
-        for (var snap = 0; snap < this.snaps.length; ++snap) {
+        for (let snap = 0; snap < this.snaps.length; ++snap) {
             this.snaps[snap].draw(context, width, height);
         }
 
         let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
             paths = editGlyph.getSplines();
         for (let p = 0; p < paths.length; ++p) {
-            this.drawPath(context, paths[p], "black", "rgba(0,0,0,0.5)", "rgba(0,0,0,0.1)");
+            this.fillPath(context, paths[p], "rgba(0,0,0,0.1)");
+            this.drawPath(context, paths[p], "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
         }
     };
 
@@ -202,7 +245,7 @@ var GLYPHERY = (function () {
         context.strokeStyle = style || "rgba(0,0,0,.5)";
         context.beginPath();
         context.moveTo(points[0].x, points[0].y);
-        for (var p = 1; p < points.length; ++p) {
+        for (let p = 1; p < points.length; ++p) {
             context.lineTo(points[p].x, points[p].y);
         }
         context.stroke();
