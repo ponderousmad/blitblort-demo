@@ -81,6 +81,7 @@ let GLYPHERY = (function () {
                 new SnapLine(new R2.V(20, 0), new R2.V(0, 1))
             ];
             this.snapDistance = 4;
+            this.vertexSize = 10;
             this.tesselation = 20;
             this.hoverPoint = new R2.V(0, 0);
 
@@ -90,6 +91,22 @@ let GLYPHERY = (function () {
             this.batch.commit();
 
             this.font = new GLYPH.Font();
+
+            this.fontGrid = {
+                glyphScale: 0.1,
+                glyphWidth: 260,
+                glyphHeight: 220,
+                xStartOffset: 20,
+                xSpacing: 4,
+                yStartOffset: 250,
+                ySpacing: 10,
+                lowerStart: "a".charCodeAt(0),
+                lowerEnd: "z".charCodeAt(0),
+                upperStart: "A".charCodeAt(0),
+                upperEnd: "Z".charCodeAt(0),
+                digitStart: "0".charCodeAt(0),
+                digitEnd: "9".charCodeAt(0)
+            };
 
             let path = new SPLINE.Path(true),
                 segment = new SPLINE.BezierCurve();
@@ -142,23 +159,53 @@ let GLYPHERY = (function () {
             return snapped;
         }
 
+        checkSelectVertex(stab) {
+            let editGlyph = this.font.glyphForCodepoint(this.editCodePoint);
+            if (editGlyph) {
+                for (const path of editGlyph.getSplines()) {
+                    for (const segment of path.getSegments()) {
+                        for (const point of segment.points) {
+                            if (R2.pointDistance(point, stab) < this.vertexSize) {
+                                this.editPoint = point;
+                            }
+                        }
+                    }
+                }
+            }
+            return this.editPoint != null;
+        }
+
+        checkSelectGlyphRow(stab, startCodePoint, endCodePoint, xOffset, yOffset) {
+            const xSpacing = this.fontGrid.glyphWidth * this.fontGrid.glyphScale + this.fontGrid.xSpacing;
+            for (let codePoint = startCodePoint; codePoint <= endCodePoint; ++codePoint) {
+                let glyphBox = new R2.AABox(xOffset, yOffset, this.fontGrid.glyphWidth * this.fontGrid.glyphScale, this.fontGrid.glyphHeight * this.fontGrid.glyphScale);
+                if (glyphBox.contains(stab)) {
+                    this.editCodePoint = codePoint;
+                    return;
+                }
+                xOffset += xSpacing;
+            }
+        }
+
+        checkSelectGlyph(stab) {
+            let yOffset = this.fontGrid.yStartOffset,
+                ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
+
+            this.checkSelectGlyphRow(stab, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.checkSelectGlyphRow(stab, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.checkSelectGlyphRow(stab, this.fontGrid.digitStart, this.fontGrid.digitEnd, this.fontGrid.xStartOffset, yOffset);
+        }
+
         update(now, elapsed, keyboard, pointer) {
-            let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
-                paths = editGlyph.getSplines();
+
             this.hoverPoint = new R2.V(pointer.hoverLocation().x, pointer.hoverLocation().y);
 
             if (pointer.activated()) {
                 let stab = new R2.V(pointer.location().x, pointer.location().y);
-                for (let i = 0; i < paths.length; ++i) {
-                    let path = paths[i];
-                    for (let s = 0; s < path.segments.length; ++s) {
-                        let points = path.segments[s].points;
-                        for (let p = 0; p < points.length; ++p) {
-                            if (R2.pointDistance(points[p], stab) < 10) {
-                                this.editPoint = points[p];
-                            }
-                        }
-                    }
+                if (!this.checkSelectVertex(stab)) {
+                    this.checkSelectGlyph(stab);
                 }
             }
 
@@ -205,12 +252,13 @@ let GLYPHERY = (function () {
             if (!path.isClosed()) {
                 this.drawLines(context, points, lineStyle);
             }
-            let prevWasHandle = false;
-            let prevPoint = null;
-            for (let s = 0; s < path.segments.length; ++s) {
-                let points = path.segments[s].points;
+            let prevWasHandle = false,
+                prevPoint = null,
+                segments = path.getSegments();
+            for (let s = 0; s < segments.length; ++s) {
+                let points = segments[s].points;
                 for (let p = 0; p < points.length; ++p) {
-                    let isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < path.segments.length - 1 || !path.isClosed()));
+                    let isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < segments.length - 1 || !path.isClosed()));
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
                     if (p > 0 || s > 0) {
                         this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleStyle : hullStyle);
@@ -225,7 +273,7 @@ let GLYPHERY = (function () {
                 }
             }
             if (path.isClosed()) {
-                this.drawLine(context, prevPoint, path.segments[0].start(), handleStyle);
+                this.drawLine(context, prevPoint, segments[0].start(), handleStyle);
             }
         }
 
@@ -248,17 +296,18 @@ let GLYPHERY = (function () {
                 snap.draw(context, width, height);
             }
 
-            let editGlyph = this.font.glyphForCodepoint(this.editCodePoint),
-                paths = editGlyph.getSplines();
-            for (const path of paths) {
-                let points = path.build(this.tesselation);
-                if (path.isClosed()) {
-                    let fillStyle = GLYPH.isInsidePolygon(points, this.hoverPoint) ? "rgba(0,64,0,0.1)" : "rgba(64,0,0, 0.1)";
-                    this.fillPath(context, path, points, fillStyle);
-                } else {
-                    this.drawLines(context, points, "rgba(0, 0, 0, 0.8)");
+            let editGlyph = this.font.glyphForCodepoint(this.editCodePoint);
+            if (editGlyph) {
+                for (const path of editGlyph.getSplines()) {
+                    let points = path.build(this.tesselation);
+                    if (path.isClosed()) {
+                        let fillStyle = GLYPH.isInsidePolygon(points, this.hoverPoint) ? "rgba(0,64,0,0.1)" : "rgba(64,0,0, 0.1)";
+                        this.fillPath(context, path, points, fillStyle);
+                    } else {
+                        this.drawLines(context, points, "rgba(0, 0, 0, 0.8)");
+                    }
+                    this.drawPath(context, path, points, "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
                 }
-                this.drawPath(context, path, points, "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
             }
         }
 
@@ -268,7 +317,7 @@ let GLYPHERY = (function () {
             context.scale(scale, scale);
             context.strokeStyle = "rgba(255,0,255,0.5)";
             context.beginPath();
-            context.rect(0, 0, 180, 180);
+            context.rect(0, 0, this.fontGrid.glyphWidth, this.fontGrid.glyphHeight);
             context.stroke();
 
             let glyph = this.font.glyphForCodepoint(codePoint);
@@ -286,29 +335,23 @@ let GLYPHERY = (function () {
             context.restore();
         }
 
-        drawGlyphRow(context, startCodePoint, endCodePoint, xOffset, yOffset, scale, xSpacing) {
+        drawGlyphRow(context, startCodePoint, endCodePoint, xOffset, yOffset) {
+            const xSpacing = this.fontGrid.glyphWidth * this.fontGrid.glyphScale + this.fontGrid.xSpacing;
             for (let codePoint = startCodePoint; codePoint <= endCodePoint; ++codePoint) {
-                this.drawScaledGlyph(context, codePoint, xOffset, yOffset, scale);
+                this.drawScaledGlyph(context, codePoint, xOffset, yOffset, this.fontGrid.glyphScale);
                 xOffset += xSpacing;
             }
         }
 
         drawFont(context, width, height) {
-            const glyphScale = 0.1;
-            const glyphWidth = 180;
-            const glyphHeight = 180;
-            const margin = 20;
-            const xSpacing = 5;
-            const ySpacing = 10;
+            let yOffset = this.fontGrid.yStartOffset,
+                ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
 
-            let xOffset = margin,
-                yOffset = 250;
-
-            this.drawGlyphRow(context, "a".charCodeAt(0), "z".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
-            yOffset += glyphHeight * glyphScale + ySpacing;
-            this.drawGlyphRow(context, "A".charCodeAt(0), "Z".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
-            yOffset += glyphHeight * glyphScale + ySpacing;
-            this.drawGlyphRow(context, "0".charCodeAt(0), "9".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
+            this.drawGlyphRow(context, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.drawGlyphRow(context, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.drawGlyphRow(context, this.fontGrid.digitStart, this.fontGrid.digitEnd, this.fontGrid.xStartOffset, yOffset);
         }
         
         draw(context, width, height) {
