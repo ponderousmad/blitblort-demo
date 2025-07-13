@@ -178,6 +178,29 @@ let GLYPHERY = (function () {
             }
         }
 
+        drawVertex(context, location, tint) { 
+            if (this.batch.loaded) {
+                BLIT.draw(context, this.vertexImage, location.x, location.y, BLIT.ALIGN.Center, null, null, BLIT.MIRROR.None, tint);
+                BLIT.draw(context, this.vertexShadow, location.x, location.y, BLIT.ALIGN.Center);
+            }
+        }
+
+        drawLines(context, points, style) {
+            context.save();
+            context.strokeStyle = style || "rgba(0,0,0,.5)";
+            context.beginPath();
+            context.moveTo(points[0].x, points[0].y);
+            for (let p = 1; p < points.length; ++p) {
+                context.lineTo(points[p].x, points[p].y);
+            }
+            context.stroke();
+            context.restore();
+        }
+        
+        drawLine(context, start, end, style) {
+            this.drawLines(context, [start, end], style);
+        }
+
         drawPath(context, path, points, lineStyle, handleStyle, hullStyle) {
             if (!path.isClosed()) {
                 this.drawLines(context, points, lineStyle);
@@ -219,10 +242,8 @@ let GLYPHERY = (function () {
             context.fill();
             context.restore();
         }
-        
-        draw(context, width, height) {
-            context.clearRect(0, 0, width, height);
 
+        drawEditGlyph(context, width, height) {
             for (const snap of this.snaps) {
                 snap.draw(context, width, height);
             }
@@ -234,32 +255,67 @@ let GLYPHERY = (function () {
                 if (path.isClosed()) {
                     let fillStyle = GLYPH.isInsidePolygon(points, this.hoverPoint) ? "rgba(0,64,0,0.1)" : "rgba(64,0,0, 0.1)";
                     this.fillPath(context, path, points, fillStyle);
+                } else {
+                    this.drawLines(context, points, "rgba(0, 0, 0, 0.8)");
                 }
                 this.drawPath(context, path, points, "black", "rgba(0,0,255,0.5)", "rgba(0,128,255,0.5)");
             }
         }
 
-        drawVertex(context, location, tint) { 
-            if (this.batch.loaded) {
-                BLIT.draw(context, this.vertexImage, location.x, location.y, BLIT.ALIGN.Center, null, null, BLIT.MIRROR.None, tint);
-                BLIT.draw(context, this.vertexShadow, location.x, location.y, BLIT.ALIGN.Center);
+        drawScaledGlyph(context, codePoint, xOffset, yOffset, scale) {
+            context.save();
+            context.translate(xOffset, yOffset);
+            context.scale(scale, scale);
+            context.strokeStyle = "rgba(255,0,255,0.5)";
+            context.beginPath();
+            context.rect(0, 0, 180, 180);
+            context.stroke();
+
+            let glyph = this.font.glyphForCodepoint(codePoint);
+            if (glyph) {
+                let paths = glyph.getSplines();
+                for (const path of paths) {
+                    let points = path.build(this.tesselation);
+                    if (path.isClosed()) {
+                        this.fillPath(context, path, points, "rgba(0, 0, 0, 0.5)");
+                    } else {
+                        this.drawLines(context, points, "rgba(0, 0, 0, 0.8)");
+                    }
+                }
             }
-        }
-        
-        drawLine(context, start, end, style) {
-            this.drawLines(context, [start, end], style);
+            context.restore();
         }
 
-        drawLines(context, points, style) {
-            context.save();
-            context.strokeStyle = style || "rgba(0,0,0,.5)";
-            context.beginPath();
-            context.moveTo(points[0].x, points[0].y);
-            for (let p = 1; p < points.length; ++p) {
-                context.lineTo(points[p].x, points[p].y);
+        drawGlyphRow(context, startCodePoint, endCodePoint, xOffset, yOffset, scale, xSpacing) {
+            for (let codePoint = startCodePoint; codePoint <= endCodePoint; ++codePoint) {
+                this.drawScaledGlyph(context, codePoint, xOffset, yOffset, scale);
+                xOffset += xSpacing;
             }
-            context.stroke();
-            context.restore();
+        }
+
+        drawFont(context, width, height) {
+            const glyphScale = 0.1;
+            const glyphWidth = 180;
+            const glyphHeight = 180;
+            const margin = 20;
+            const xSpacing = 5;
+            const ySpacing = 10;
+
+            let xOffset = margin,
+                yOffset = 250;
+
+            this.drawGlyphRow(context, "a".charCodeAt(0), "z".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
+            yOffset += glyphHeight * glyphScale + ySpacing;
+            this.drawGlyphRow(context, "A".charCodeAt(0), "Z".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
+            yOffset += glyphHeight * glyphScale + ySpacing;
+            this.drawGlyphRow(context, "0".charCodeAt(0), "9".charCodeAt(0), margin, yOffset, glyphScale, glyphWidth * glyphScale + xSpacing);
+        }
+        
+        draw(context, width, height) {
+            context.clearRect(0, 0, width, height);
+
+            this.drawEditGlyph(context, width, height);
+            this.drawFont(context, width, height);
         }
 
         checkpoint() {
