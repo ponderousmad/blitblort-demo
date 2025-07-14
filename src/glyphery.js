@@ -110,8 +110,7 @@ let GLYPHERY = (function () {
             this.vertexShadow = this.batch.load("vertexShadow.png");
             this.batch.commit();
 
-            this.font = new GLYPH.Font();
-
+            this.font = null;
             this.fontGrid = {
                 glyphScale: 0.1,
                 glyphWidth: 260,
@@ -128,32 +127,10 @@ let GLYPHERY = (function () {
                 digitEnd: "9".charCodeAt(0)
             };
 
-            let path = new SPLINE.Path(true),
-                segment = new SPLINE.BezierCurve();
-
-            path.addSegment(segment);
-            segment.addPoint(new R2.V(20,  20));
-            segment.addPoint(new R2.V(50,  20));
-            segment.addPoint(new R2.V(90,  20));
-            segment.addPoint(new R2.V(120, 20));
-
-            segment = new SPLINE.LineSegment(undefined, new R2.V(120, 180));
-            path.addSegment(segment);
-
-            segment = new SPLINE.BezierCurve();
-            path.addSegment(segment);
-            segment.addPoint(new R2.V(90, 180));
-            segment.addPoint(new R2.V(50, 180));
-            segment.addPoint(new R2.V(20, 180));
-
-            segment = new SPLINE.LineSegment();
-            path.addSegment(segment);
-
             this.editCodePoint = "A".codePointAt(0);
             this.editSpline = 0;
             this.editSegment = 0;
             this.editPoint = null;
-            this.font.newGlyph(this.editCodePoint, [path]);
 
             let editor = this;
             document.getElementById("buttonSave").addEventListener("click", function() {
@@ -163,7 +140,9 @@ let GLYPHERY = (function () {
                 editor.loadCheckpoint();
             }, false);
 
-            this.checkpoint();
+            IO.downloadJSON("blitblort/fonts/test.json", function (data) {
+                editor.loadFont(data);
+            });
         }
 
         snap(point, snapDistance) {
@@ -206,9 +185,9 @@ let GLYPHERY = (function () {
             let yOffset = this.fontGrid.yStartOffset,
                 ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
 
-            this.checkSelectGlyphRow(stab, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
-            yOffset += ySpacing;
             this.checkSelectGlyphRow(stab, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.checkSelectGlyphRow(stab, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
             yOffset += ySpacing;
             this.checkSelectGlyphRow(stab, this.fontGrid.digitStart, this.fontGrid.digitEnd, this.fontGrid.xStartOffset, yOffset);
         }
@@ -238,7 +217,9 @@ let GLYPHERY = (function () {
         }
 
         update(now, elapsed, keyboard, pointer) {
-
+            if (!this.font) {
+                return;
+            }
             this.hoverPoint = new R2.V(pointer.hoverLocation().x, pointer.hoverLocation().y);
 
             if (pointer.activated()) {
@@ -390,9 +371,9 @@ let GLYPHERY = (function () {
             let yOffset = this.fontGrid.yStartOffset,
                 ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
 
-            this.drawGlyphRow(context, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
-            yOffset += ySpacing;
             this.drawGlyphRow(context, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
+            yOffset += ySpacing;
+            this.drawGlyphRow(context, this.fontGrid.lowerStart, this.fontGrid.lowerEnd, this.fontGrid.xStartOffset, yOffset);
             yOffset += ySpacing;
             this.drawGlyphRow(context, this.fontGrid.digitStart, this.fontGrid.digitEnd, this.fontGrid.xStartOffset, yOffset);
         }
@@ -400,8 +381,17 @@ let GLYPHERY = (function () {
         draw(context, width, height) {
             context.clearRect(0, 0, width, height);
 
-            this.drawEditGlyph(context, width, height);
-            this.drawFont(context, width, height);
+            if (this.font) {
+                this.drawEditGlyph(context, width, height);
+                this.drawFont(context, width, height);
+            }
+        }
+
+        loadFont(data) {
+            let font = new GLYPH.Font();
+            font.load(data);
+            this.font = font;
+            this.checkpoint();
         }
 
         checkpoint() {
