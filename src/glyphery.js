@@ -67,6 +67,25 @@ let GLYPHERY = (function () {
         }
     }
 
+    class Rectangle extends Object {
+        constructor(startLocation) {
+            super();
+            this.topLeft = startLocation.clone();
+            this.topRight = this.topLeft.clone();
+            this.bottomLeft = this.topLeft.clone();
+            this.bottomRight = this.topLeft.clone();
+            this.spline = new SPLINE.Path(true);
+            this.spline.addSegment(new SPLINE.LineSegment(this.topLeft, this.topRight));
+            this.spline.addSegment(new SPLINE.LineSegment(undefined, this.bottomRight));
+            this.spline.addSegment(new SPLINE.LineSegment(undefined, this.bottomLeft));
+        }
+
+        update() {
+            this.topRight.x = this.bottomRight.x;
+            this.bottomLeft.y = this.bottomRight.y;
+        }
+    };
+
     class Editor extends Object {
         constructor() {
             super();
@@ -84,6 +103,7 @@ let GLYPHERY = (function () {
             this.vertexSize = 10;
             this.tesselation = 20;
             this.hoverPoint = new R2.V(0, 0);
+            this.addRect = null;
 
             this.batch = new BLIT.Batch("images/");
             this.vertexImage = this.batch.load("vertex.png");
@@ -193,29 +213,57 @@ let GLYPHERY = (function () {
             this.checkSelectGlyphRow(stab, this.fontGrid.digitStart, this.fontGrid.digitEnd, this.fontGrid.xStartOffset, yOffset);
         }
 
+        addRectangle(stab) {
+            this.addRect = new Rectangle(stab);
+            this.editPoint = this.addRect.bottomRight;
+
+            let editGlyph = this.font.glyphForCodepoint(this.editCodePoint);
+            if (editGlyph) {
+                editGlyph.addSpline(this.addRect.spline);
+            } else {
+                this.font.newGlyph(this.editCodePoint, [this.addRect.spline]);
+            }
+        }
+
+        getStab(pointer) {
+            return new R2.V(pointer.location().x, pointer.location().y);
+        }
+
+        getSnappedStab(keyboard, pointer) {
+            let stab = this.getStab(pointer);
+            if (keyboard.isCtrlDown()) {
+                stab = this.snap(stab, this.snapDistance);
+            }
+            return stab;
+        }
+
         update(now, elapsed, keyboard, pointer) {
 
             this.hoverPoint = new R2.V(pointer.hoverLocation().x, pointer.hoverLocation().y);
 
             if (pointer.activated()) {
-                let stab = new R2.V(pointer.location().x, pointer.location().y);
+                if (keyboard.isAsciiDown("B")) {
+                    this.addRectangle(this.getSnappedStab(keyboard, pointer));
+
+                    // Early out
+                    return;
+                }
+
+                let stab = this.getStab(pointer);
                 if (!this.checkSelectVertex(stab)) {
                     this.checkSelectGlyph(stab);
                 }
             }
 
-            if (keyboard.isKeyDown(POKI.KEYS.GT)) {
-            }
-
             if (this.editPoint) {
                 if (pointer.primary) {
-                    let stab = new R2.V(pointer.location().x, pointer.location().y);
-                    if (keyboard.isCtrlDown()) {
-                        stab = this.snap(stab, this.snapDistance);
+                    this.editPoint.copy(this.getSnappedStab(keyboard, pointer));
+                    if (this.addRect) {
+                        this.addRect.update();
                     }
-                    this.editPoint.copy(stab);
                 } else {
                     this.editPoint = null;
+                    this.addRect = null;
                 }
             }
         }
@@ -253,7 +301,7 @@ let GLYPHERY = (function () {
             for (let s = 0; s < segments.length; ++s) {
                 let points = segments[s].controlPoints();
                 for (let p = 0; p < points.length; ++p) {
-                    let isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < segments.length - 1 || !path.isClosed()));
+                    let isHandle = (p === 0 && s === 0) || segments[s].isLinear() || (p === (points.length - 1) && (s < segments.length - 1 || !path.isClosed()));
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
                     if (p > 0 || s > 0) {
                         this.drawLine(context, prevPoint, points[p], isHandle || prevWasHandle ? handleStyle : hullStyle);
