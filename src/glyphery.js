@@ -117,11 +117,8 @@ let GLYPHERY = (function () {
             segment.addPoint(new R2.V(90,  20));
             segment.addPoint(new R2.V(120, 20));
 
-            segment = new SPLINE.BezierCurve();
+            segment = new SPLINE.LineSegment(undefined, new R2.V(120, 180));
             path.addSegment(segment);
-            segment.addPoint(new R2.V(120, 60));
-            segment.addPoint(new R2.V(120, 140));
-            segment.addPoint(new R2.V(120, 180));
 
             segment = new SPLINE.BezierCurve();
             path.addSegment(segment);
@@ -129,10 +126,8 @@ let GLYPHERY = (function () {
             segment.addPoint(new R2.V(50, 180));
             segment.addPoint(new R2.V(20, 180));
 
-            segment = new SPLINE.BezierCurve();
+            segment = new SPLINE.LineSegment();
             path.addSegment(segment);
-            segment.addPoint(new R2.V(20, 140));
-            segment.addPoint(new R2.V(20, 60));
 
             this.editCodePoint = "A".codePointAt(0);
             this.editSpline = 0;
@@ -164,7 +159,7 @@ let GLYPHERY = (function () {
             if (editGlyph) {
                 for (const path of editGlyph.getSplines()) {
                     for (const segment of path.getSegments()) {
-                        for (const point of segment.points) {
+                        for (const point of segment.controlPoints()) {
                             if (R2.pointDistance(point, stab) < this.vertexSize) {
                                 this.editPoint = point;
                             }
@@ -256,7 +251,7 @@ let GLYPHERY = (function () {
                 prevPoint = null,
                 segments = path.getSegments();
             for (let s = 0; s < segments.length; ++s) {
-                let points = segments[s].points;
+                let points = segments[s].controlPoints();
                 for (let p = 0; p < points.length; ++p) {
                     let isHandle = (p === 0 && s === 0) || (p === (points.length - 1) && (s < segments.length - 1 || !path.isClosed()));
                     this.drawVertex(context, points[p], isHandle ? [0,1,0] : [1,0,0]);
