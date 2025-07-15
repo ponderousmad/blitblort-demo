@@ -78,6 +78,7 @@ let GLYPHERY = (function () {
             this.spline.addSegment(new SPLINE.LineSegment(this.topLeft, this.topRight));
             this.spline.addSegment(new SPLINE.LineSegment(undefined, this.bottomRight));
             this.spline.addSegment(new SPLINE.LineSegment(undefined, this.bottomLeft));
+            this.spline.addSegment(new SPLINE.LineSegment(undefined, undefined));
         }
 
         update() {
@@ -128,9 +129,7 @@ let GLYPHERY = (function () {
             };
 
             this.editCodePoint = "A".codePointAt(0);
-            this.editSpline = 0;
-            this.editSegment = 0;
-            this.editPoint = null;
+            this.clearEditPoint(true);
 
             let editor = this;
             document.getElementById("buttonSave").addEventListener("click", function() {
@@ -153,28 +152,53 @@ let GLYPHERY = (function () {
             return snapped;
         }
 
+        clearEditPoint(clearLast) {
+            this.editPath = null;
+            this.editSegment = null;
+            this.editPoint = null;
+            if (clearLast) {
+                this.lastEditPath = null;
+                this.lastEditSegment = null;
+                this.lastEditPoint = null;
+            }
+        }
+
+        setEditPoint(path, segment, point) {
+            this.editPath = path;
+            this.lastEditPath = path;
+            this.editSegment = segment;
+            this.lastEditSegment = segment;
+            this.editPoint = point;
+            this.lastEditPoint = point;
+        }
+
         checkSelectVertex(stab) {
             let editGlyph = this.font.glyphForCodepoint(this.editCodePoint);
             if (editGlyph) {
                 for (const path of editGlyph.getSplines()) {
-                    for (const segment of path.getSegments()) {
+                    let isLoopPoint = path.isClosed(),
+                        segments = path.getSegments();
+                    for (const segment of segments) {
                         for (const point of segment.controlPoints()) {
                             if (R2.pointDistance(point, stab) < this.vertexSize) {
-                                this.editPoint = point;
+                                this.setEditPoint(path, isLoopPoint ? segments[segments.length - 1] : segment, point);
+                                return true;
                             }
+                            isLoopPoint = false;
                         }
                     }
                 }
             }
-            return this.editPoint != null;
+            return false;
         }
 
         checkSelectGlyphRow(stab, startCodePoint, endCodePoint, xOffset, yOffset) {
             const xSpacing = this.fontGrid.glyphWidth * this.fontGrid.glyphScale + this.fontGrid.xSpacing;
             for (let codePoint = startCodePoint; codePoint <= endCodePoint; ++codePoint) {
                 let glyphBox = new R2.AABox(xOffset, yOffset, this.fontGrid.glyphWidth * this.fontGrid.glyphScale, this.fontGrid.glyphHeight * this.fontGrid.glyphScale);
-                if (glyphBox.contains(stab)) {
+                if (glyphBox.contains(stab) && this.editCodePoint != codePoint) {
                     this.editCodePoint = codePoint;
+                    this.clearEditPoint(true);
                     return;
                 }
                 xOffset += xSpacing;
@@ -194,7 +218,6 @@ let GLYPHERY = (function () {
 
         addRectangle(stab) {
             this.addRect = new Rectangle(stab);
-            this.editPoint = this.addRect.bottomRight;
 
             let editGlyph = this.font.glyphForCodepoint(this.editCodePoint);
             if (editGlyph) {
@@ -202,6 +225,7 @@ let GLYPHERY = (function () {
             } else {
                 this.font.newGlyph(this.editCodePoint, [this.addRect.spline]);
             }
+            this.setEditPoint(this.addRect.spline, null, this.addRect.bottomRight);
         }
 
         getStab(pointer) {
@@ -216,6 +240,36 @@ let GLYPHERY = (function () {
             return stab;
         }
 
+        makeAltLastSegment(path, segment, point) {
+            let segments = path.getSegments(),
+                segmentIndex = segments.indexOf(segment),
+                isLast = segmentIndex == segments.length - 1,
+                endPoint = path.isClosed() && isLast ? segments[0].start() : segment.end(),
+                startPoint = segmentIndex == 0 ? segments[0].start() : segments[segmentIndex - 1].end();
+
+            if (segment.isLinear()) {
+                let curve = new SPLINE.BezierCurve();
+                if (segmentIndex == 0) {
+                    curve.addPoint(startPoint.clone());
+                }
+
+                let lineSegment = new R2.Segment(startPoint, endPoint);
+                curve.addPoint(lineSegment.interpolate(0.25));
+                curve.addPoint(lineSegment.interpolate(0.75));
+
+                if (!path.isClosed || !isLast) {
+                    curve.addPoint(endPoint.clone());
+                }
+                
+                return curve;
+            } else {
+                return new SPLINE.LineSegment(
+                    segmentIndex == 0 ? startPoint.clone() : undefined,
+                    path.isClosed() && isLast ? undefined : endPoint.clone()
+                );
+            }
+        }
+
         update(now, elapsed, keyboard, pointer) {
             if (!this.font) {
                 return;
@@ -226,7 +280,22 @@ let GLYPHERY = (function () {
                 if (keyboard.isAsciiDown("B")) {
                     this.addRectangle(this.getSnappedStab(keyboard, pointer));
 
-                    // Early out
+                    // Early out to avoid running selection logic.
+                    return;
+                } else if (keyboard.isAsciiDown("A") && this.lastEditSegment) {
+                    // Add a new segment after the current one, unless the start point is selected, then it goes in front.
+                    let segments = this.lastEditPath.getSegments(),
+                        replaceStart = this.lastEditPoint == segments[0].start(),
+                        insertIndex = replaceStart ? 0 : segments.indexOf(this.lastEditSegment) + 1,
+                        newSegment = new SPLINE.LineSegment(replaceStart ? this.lastEditPoint : undefined, this.getSnappedStab(keyboard, pointer));
+                    segments.splice(insertIndex, 0, newSegment);
+
+                    if (replaceStart) {
+                        segments[1].clearStart();
+                    }
+                    this.setEditPoint(this.lastEditPath, newSegment, newSegment.end());
+
+                    // Early out to avoid running selection logic.
                     return;
                 }
 
@@ -234,6 +303,22 @@ let GLYPHERY = (function () {
                 if (!this.checkSelectVertex(stab)) {
                     this.checkSelectGlyph(stab);
                 }
+            } else if (keyboard.wasAsciiPressed("T") && this.lastEditSegment) {
+                let segments = this.lastEditPath.getSegments(),
+                    segmentIndex = segments.indexOf(this.lastEditSegment),
+                    newSegment = this.makeAltLastSegment(this.lastEditPath, this.lastEditSegment, this.lastEditPoint);
+                segments.splice(segmentIndex, 1, newSegment);
+
+                this.lastEditSegment = newSegment;
+                if (this.lastEditPath.isClosed() && segmentIndex == segments.length - 1) {
+                    this.lastEditPoint = segments[0].start();
+                } else {
+                    this.lastEditPoint = newSegment.end();
+                }
+                this.clearEditPoint(false);
+
+                // Early out to avoid running selection logic.
+                return;
             }
 
             if (this.editPoint) {
@@ -243,7 +328,7 @@ let GLYPHERY = (function () {
                         this.addRect.update();
                     }
                 } else {
-                    this.editPoint = null;
+                    this.clearEditPoint(false);
                     this.addRect = null;
                 }
             }
