@@ -319,6 +319,31 @@ let GLYPHERY = (function () {
 
                 // Early out to avoid running selection logic.
                 return;
+            } else if (keyboard.wasAsciiPressed("D") && this.lastEditSegment) {
+                let segments = this.lastEditPath.getSegments();
+                // If two or fewer points, just delete the whole path
+                if(segments.length < 3) {
+                    let glyph = this.font.glyphForCodepoint(this.editCodePoint),
+                        paths = glyph.getSplines(),
+                        pathIndex = paths.indexOf(this.lastEditPath);
+                    paths.splice(pathIndex, 1);
+                } else {
+                    let segmentIndex = segments.indexOf(this.lastEditSegment);
+
+                    // For looping paths, need special handling when the start point is selected
+                    if(segmentIndex == segments.length - 1 && this.lastEditPath.isClosed()) {
+                        let newLast = segments[segmentIndex - 1];
+                        segments[0].setStart(newLast.end());
+                        newLast.clearEnd();
+                    } else if(segmentIndex == 0) {
+                        segments[1].setStart(this.lastEditSegment.start());
+                    }
+                    segments.splice(segmentIndex, 1);
+                }
+
+                this.clearEditPoint(true);
+                // Early out to avoid running selection logic.
+                return;
             }
 
             if (this.editPoint) {
