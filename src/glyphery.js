@@ -287,13 +287,26 @@ let GLYPHERY = (function () {
                     let segments = this.lastEditPath.getSegments(),
                         replaceStart = this.lastEditPoint == segments[0].start(),
                         insertIndex = replaceStart ? 0 : segments.indexOf(this.lastEditSegment) + 1,
-                        newSegment = new SPLINE.LineSegment(replaceStart ? this.lastEditPoint : undefined, this.getSnappedStab(keyboard, pointer));
+                        atEndOfLoop = this.lastEditPath.isClosed() && insertIndex == segments.length,
+                        isBezierHandle = !replaceStart && this.lastEditSegment.end() != this.lastEditPoint,
+                        newPoint = this.getSnappedStab(keyboard, pointer),
+                        newSegment = new SPLINE.LineSegment(replaceStart ? segments[0].start() : undefined, atEndOfLoop ? undefined : newPoint);
                     segments.splice(insertIndex, 0, newSegment);
 
                     if (replaceStart) {
                         segments[1].clearStart();
                     }
-                    this.setEditPoint(this.lastEditPath, newSegment, newSegment.end());
+                    let addedPoint = newSegment.end();
+                    if (atEndOfLoop) {
+                        segments[insertIndex - 1].setEnd(newPoint);
+                        addedPoint = segments[insertIndex - 1].end();
+                    } else if(isBezierHandle) {
+                        addedPoint = this.lastEditSegment.end();
+                        let swapPoint = addedPoint.clone();
+                        addedPoint.copy(newSegment.end());
+                        newSegment.end().copy(swapPoint);
+                    }
+                    this.setEditPoint(this.lastEditPath, newSegment, addedPoint);
 
                     // Early out to avoid running selection logic.
                     return;
