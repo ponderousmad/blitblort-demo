@@ -11,13 +11,15 @@ let GLYPHERY = (function () {
             this.dash = [10, 2, 5, 2];
         }
 
-        draw(context, width, height) {
+        draw(context, editWidth, editHeight) {
+            let maxDim = Math.max(editWidth, editHeight),
+                drawDistance = maxDim * (1 / Math.max(this.axis.x, this.axis.y));
             context.save();
             context.strokeStyle = this.style;
             context.setLineDash(this.dash);
             context.beginPath();
             context.moveTo(this.origin.x, this.origin.y);
-            context.lineTo(this.origin.x + width * this.axis.x, this.origin.y + height * this.axis.y);
+            context.lineTo(this.origin.x + drawDistance * this.axis.x, this.origin.y + drawDistance * this.axis.y);
             context.stroke();
             context.restore();
         };
@@ -118,7 +120,7 @@ let GLYPHERY = (function () {
                 glyphHeight: 220,
                 xStartOffset: 20,
                 xSpacing: 4,
-                yStartOffset: 250,
+                yStartOffset: 40,
                 ySpacing: 10,
                 lowerStart: "a".charCodeAt(0),
                 lowerEnd: "z".charCodeAt(0),
@@ -206,7 +208,7 @@ let GLYPHERY = (function () {
         }
 
         checkSelectGlyph(stab) {
-            let yOffset = this.fontGrid.yStartOffset,
+            let yOffset = this.fontGrid.glyphHeight + this.fontGrid.yStartOffset,
                 ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
 
             this.checkSelectGlyphRow(stab, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
@@ -491,7 +493,7 @@ let GLYPHERY = (function () {
         }
 
         drawFont(context, width, height) {
-            let yOffset = this.fontGrid.yStartOffset,
+            let yOffset = this.fontGrid.glyphHeight + this.fontGrid.yStartOffset,
                 ySpacing = this.fontGrid.glyphHeight * this.fontGrid.glyphScale + this.fontGrid.ySpacing;
 
             this.drawGlyphRow(context, this.fontGrid.upperStart, this.fontGrid.upperEnd, this.fontGrid.xStartOffset, yOffset);
@@ -522,7 +524,7 @@ let GLYPHERY = (function () {
         }
 
         loadCheckpoint() {
-            this.font.loadFromJSON(this.fontEditArea.value);
+            this.font.load(JSON.parse(this.fontEditArea.value));
         }
     }
 
